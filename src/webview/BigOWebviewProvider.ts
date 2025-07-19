@@ -5,13 +5,27 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "bigONotation.analysisView";
 
   private _view?: vscode.WebviewView;
-  private _lastAnalysis?: {
-    methods: MethodAnalysis[];
-    fileName?: string;
-    hierarchy?: Map<string, string[]>;
-  };
+  private _fileAnalyses: Map<
+    string,
+    {
+      methods: MethodAnalysis[];
+      fileName?: string;
+      hierarchy?: Map<string, string[]>;
+    }
+  > = new Map();
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _context: vscode.ExtensionContext
+  ) {
+    // Load previous analysis from persistent state
+    this._loadState();
+
+    // Listen for active editor changes to update the view
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      this._onActiveEditorChanged(editor);
+    });
+  }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -27,19 +41,61 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-    // If we have a previous analysis, show it immediately
-    if (this._lastAnalysis) {
-      this.updateAnalysis(
-        this._lastAnalysis.methods,
-        this._lastAnalysis.fileName,
-        this._lastAnalysis.hierarchy
-      );
-    }
-
     webviewView.webview.onDidReceiveMessage((data) => {
       switch (data.type) {
         case "analyzeCode": {
           vscode.commands.executeCommand("bigONotation.analyzeComplexity");
+          break;
+        }
+        case "webviewReady": {
+          // Webview is ready, check if we should show cached data
+          const activeEditor = vscode.window.activeTextEditor;
+          const isValidPythonFile =
+            activeEditor && activeEditor.document.fileName.endsWith(".py");
+
+          console.log(
+            "BigO: Webview ready, active file:",
+            activeEditor?.document.fileName || "none"
+          );
+
+          if (isValidPythonFile) {
+            const currentFileName =
+              activeEditor.document.fileName.split("\\").pop() ||
+              activeEditor.document.fileName.split("/").pop() ||
+              "Unknown file";
+
+            const fileAnalysis = this._fileAnalyses.get(
+              activeEditor.document.fileName
+            );
+
+            if (fileAnalysis) {
+              console.log("BigO: Sending cached analysis for current file");
+              this._view?.webview.postMessage({
+                type: "updateAnalysis",
+                methods: fileAnalysis.methods,
+                fileName: fileAnalysis.fileName,
+                hierarchy: fileAnalysis.hierarchy
+                  ? Array.from(fileAnalysis.hierarchy.entries())
+                  : [],
+              });
+            } else {
+              console.log("BigO: No cached analysis for current file");
+              this._view?.webview.postMessage({
+                type: "updateAnalysis",
+                methods: [],
+                fileName: currentFileName,
+                hierarchy: [],
+              });
+            }
+          } else {
+            console.log("BigO: No valid Python file open, clearing view");
+            this._view?.webview.postMessage({
+              type: "updateAnalysis",
+              methods: [],
+              fileName: undefined,
+              hierarchy: [],
+            });
+          }
           break;
         }
       }
@@ -51,8 +107,21 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
     fileName?: string,
     hierarchy?: Map<string, string[]>
   ) {
-    // Store the analysis for when the webview is ready
-    this._lastAnalysis = { methods, fileName, hierarchy };
+    // Get the current active editor to store analysis with file path
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor || !fileName) {
+      return;
+    }
+
+    // Store the analysis for the specific file
+    this._fileAnalyses.set(activeEditor.document.fileName, {
+      methods,
+      fileName,
+      hierarchy,
+    });
+
+    // Persist the analysis to VS Code's global state
+    this._saveState();
 
     if (this._view) {
       this._view.webview.postMessage({
@@ -60,6 +129,128 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
         methods: methods,
         fileName: fileName,
         hierarchy: hierarchy ? Array.from(hierarchy.entries()) : [],
+      });
+    }
+  }
+
+  private _loadState() {
+    try {
+      const savedState = this._context.globalState.get<
+        Array<
+          [
+            string,
+            {
+              methods: MethodAnalysis[];
+              fileName?: string;
+              hierarchy?: [string, string[]][];
+            }
+          ]
+        >
+      >("bigOAnalysis.fileAnalyses");
+
+      if (savedState) {
+        console.log(
+          "BigO: Loading saved state with",
+          savedState.length,
+          "files"
+        );
+        this._fileAnalyses = new Map(
+          savedState.map(([filePath, analysis]) => {
+            return [
+              filePath,
+              {
+                methods: analysis.methods,
+                fileName: analysis.fileName,
+                hierarchy: analysis.hierarchy
+                  ? new Map(analysis.hierarchy)
+                  : undefined,
+              },
+            ];
+          })
+        );
+      } else {
+        console.log("BigO: No saved state found");
+      }
+    } catch (error) {
+      console.error("Failed to load BigO analysis state:", error);
+    }
+  }
+
+  private _saveState() {
+    try {
+      if (this._fileAnalyses.size > 0) {
+        console.log(
+          "BigO: Saving state with",
+          this._fileAnalyses.size,
+          "files"
+        );
+        const stateToSave = Array.from(this._fileAnalyses.entries()).map(
+          ([filePath, analysis]) => {
+            return [
+              filePath,
+              {
+                methods: analysis.methods,
+                fileName: analysis.fileName,
+                hierarchy: analysis.hierarchy
+                  ? Array.from(analysis.hierarchy.entries())
+                  : undefined,
+              },
+            ];
+          }
+        );
+        this._context.globalState.update(
+          "bigOAnalysis.fileAnalyses",
+          stateToSave
+        );
+      }
+    } catch (error) {
+      console.error("Failed to save BigO analysis state:", error);
+    }
+  }
+
+  private _onActiveEditorChanged(editor: vscode.TextEditor | undefined) {
+    if (!this._view) {
+      return;
+    }
+
+    const isValidPythonFile =
+      editor && editor.document.fileName.endsWith(".py");
+
+    if (!isValidPythonFile) {
+      // No valid Python file, clear the view
+      this._view.webview.postMessage({
+        type: "updateAnalysis",
+        methods: [],
+        fileName: undefined,
+        hierarchy: [],
+      });
+      return;
+    }
+
+    // Check if we have cached analysis for this file
+    const fileAnalysis = this._fileAnalyses.get(editor.document.fileName);
+
+    if (fileAnalysis) {
+      // Show cached analysis for this file
+      this._view.webview.postMessage({
+        type: "updateAnalysis",
+        methods: fileAnalysis.methods,
+        fileName: fileAnalysis.fileName,
+        hierarchy: fileAnalysis.hierarchy
+          ? Array.from(fileAnalysis.hierarchy.entries())
+          : [],
+      });
+    } else {
+      // No cached analysis, show empty state with current file name
+      const currentFileName =
+        editor.document.fileName.split("\\").pop() ||
+        editor.document.fileName.split("/").pop() ||
+        "Unknown file";
+      this._view.webview.postMessage({
+        type: "updateAnalysis",
+        methods: [],
+        fileName: currentFileName,
+        hierarchy: [],
       });
     }
   }
@@ -210,6 +401,11 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
 
         <script>
             const vscode = acquireVsCodeApi();
+
+            // Signal that the webview is ready
+            window.addEventListener('load', () => {
+                vscode.postMessage({ type: 'webviewReady' });
+            });
 
             function analyzeCode() {
                 vscode.postMessage({ type: 'analyzeCode' });

@@ -29,7 +29,13 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
   private _fileAnalyses: Map<string, FileAnalysis> = new Map();
   private _isScanning: boolean = false;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _context?: vscode.ExtensionContext
+  ) {
+    // Load previous file analyses from persistent state
+    this._loadState();
+  }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -44,9 +50,6 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
     };
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
-
-    // Start scanning all Python files when the webview loads
-    this._scanAllPythonFiles();
 
     webviewView.webview.onDidReceiveMessage((data) => {
       switch (data.type) {
@@ -64,6 +67,16 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
         }
         case "navigateToFunction": {
           this._navigateToFunction(data.fileUri, data.functionName);
+          break;
+        }
+        case "webviewReady": {
+          // Webview is ready, now send any cached data
+          if (this._fileAnalyses.size > 0) {
+            this._refreshView();
+          } else {
+            // Start scanning all Python files when the webview loads and no cached data
+            this._scanAllPythonFiles();
+          }
           break;
         }
       }
@@ -238,6 +251,17 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
       hierarchy,
     });
 
+    // Save state to persistence
+    this._saveState();
+
+    this._refreshView();
+  }
+
+  public clearCache() {
+    this._fileAnalyses.clear();
+    if (this._context) {
+      this._context.globalState.update("fileOverview.analyses", undefined);
+    }
     this._refreshView();
   }
 
@@ -750,6 +774,11 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
             const vscode = acquireVsCodeApi();
             let currentSortBy = 'alphabetic';
 
+            // Signal that the webview is ready
+            window.addEventListener('load', () => {
+                vscode.postMessage({ type: 'webviewReady' });
+            });
+
             window.addEventListener('message', event => {
                 const message = event.data;
                 switch (message.type) {
@@ -1090,5 +1119,71 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
         </script>
     </body>
     </html>`;
+  }
+
+  private _loadState() {
+    try {
+      if (!this._context) {
+        return;
+      }
+
+      const savedAnalyses = this._context.globalState.get<
+        Array<[string, FileAnalysis]>
+      >("fileOverview.analyses");
+
+      if (savedAnalyses) {
+        console.log(
+          "FileOverview: Loading saved state with",
+          savedAnalyses.length,
+          "files"
+        );
+        this._fileAnalyses = new Map(
+          savedAnalyses.map(([key, analysis]) => {
+            // Restore hierarchy Map if it exists
+            if (analysis.hierarchy && Array.isArray(analysis.hierarchy)) {
+              analysis.hierarchy = new Map(
+                analysis.hierarchy as [string, string[]][]
+              );
+            }
+            return [key, analysis];
+          })
+        );
+      } else {
+        console.log("FileOverview: No saved state found");
+      }
+    } catch (error) {
+      console.error("Failed to load file overview state:", error);
+    }
+  }
+
+  private _saveState() {
+    try {
+      if (!this._context) {
+        return;
+      }
+
+      // Convert Map to array for serialization
+      const analysesToSave = Array.from(this._fileAnalyses.entries()).map(
+        ([key, analysis]) => {
+          // Convert hierarchy Map to array for serialization
+          const serializedAnalysis = {
+            ...analysis,
+            hierarchy: analysis.hierarchy
+              ? Array.from(analysis.hierarchy.entries())
+              : undefined,
+          };
+          return [key, serializedAnalysis];
+        }
+      );
+
+      console.log(
+        "FileOverview: Saving state with",
+        analysesToSave.length,
+        "files"
+      );
+      this._context.globalState.update("fileOverview.analyses", analysesToSave);
+    } catch (error) {
+      console.error("Failed to save file overview state:", error);
+    }
   }
 }

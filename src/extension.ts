@@ -15,9 +15,10 @@ export function activate(context: vscode.ExtensionContext) {
   console.log("Big-O Notation extension is now active!");
 
   // Create webview providers
-  const provider = new BigOWebviewProvider(context.extensionUri);
+  const provider = new BigOWebviewProvider(context.extensionUri, context);
   const overviewProvider = new FileOverviewWebviewProvider(
-    context.extensionUri
+    context.extensionUri,
+    context
   );
 
   // Register webview providers
