@@ -17,6 +17,11 @@
         "command": "bigONotation.analyzeComplexity",
         "title": "Add Big-O Comments to Python Methods",
         "category": "Big-O"
+      },
+      {
+        "command": "bigONotation.reapplyDecorations",
+        "title": "Reapply Big-O Color Decorations",
+        "category": "Big-O"
       }
     ],
     "views": {

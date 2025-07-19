@@ -5,6 +5,7 @@ import { getComplexityIndicator } from "../utils/complexityHelperUtils";
 import { addBigOComments } from "../comments/commentManager";
 import { applyComplexityDecorations } from "../decorations/decorationManager";
 import { compareComplexityPriority } from "../utils/timeComplexityComparatorUtils";
+import { applyAndPersistDecorations } from "../decorations/decorationPersistence";
 
 // Register the main command to analyze Python file and add Big-O comments
 export function registerAnalyzeComplexityCommand(
@@ -93,4 +94,31 @@ export function registerAutoAnalyzeCommand(
       provider.updateAnalysis(methods);
     }
   });
+}
+
+export function registerReapplyDecorationsCommand(): vscode.Disposable {
+  return vscode.commands.registerCommand(
+    "bigONotation.reapplyDecorations",
+    () => {
+      const activeEditor = vscode.window.activeTextEditor;
+      if (!activeEditor) {
+        vscode.window.showErrorMessage(
+          "No active editor found. Please open a Python file."
+        );
+        return;
+      }
+
+      if (!activeEditor.document.fileName.endsWith(".py")) {
+        vscode.window.showErrorMessage(
+          "Please open a Python file (.py) to apply decorations."
+        );
+        return;
+      }
+
+      applyAndPersistDecorations(activeEditor);
+      vscode.window.showInformationMessage(
+        "✨ Big-O complexity decorations reapplied!"
+      );
+    }
+  );
 }

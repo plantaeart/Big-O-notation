@@ -3,8 +3,10 @@ import { analyzeCodeComplexity } from "./analysis/complexityAnalyzer";
 import { BigOWebviewProvider } from "./webview/BigOWebviewProvider";
 import {
   registerAnalyzeComplexityCommand,
+  registerReapplyDecorationsCommand,
   registerShowStatusBarCommand,
 } from "./commands/commandRegistry";
+import { registerDecorationPersistence } from "./decorations/decorationPersistence";
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("Big-O Notation extension is now active!");
@@ -22,8 +24,12 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     registerAnalyzeComplexityCommand(provider),
-    registerShowStatusBarCommand()
+    registerShowStatusBarCommand(),
+    registerReapplyDecorationsCommand()
   );
+
+  // Register decoration persistence to maintain colors when switching files
+  registerDecorationPersistence(context);
 
   // Auto-analyze when Python file is opened
   context.subscriptions.push(
