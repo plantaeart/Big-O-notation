@@ -1,8 +1,6 @@
-import {
-  countFunctionCalls,
-  extractFunctionName,
-  isFunctionDefinition,
-} from "../utils/codeParser";
+import { PythonKeywords } from "../constants/pythonKeyWordsConst";
+import { TimeComplexityNotation } from "../constants/timeComplexityNotationsConst";
+import { countFunctionCalls } from "../utils/codeParserUtils";
 
 // Analyze recursive patterns in a function
 export function analyzeRecursion(
@@ -23,8 +21,8 @@ export function analyzeRecursion(
 
     // Check for base case patterns
     if (
-      trimmed.startsWith("if ") &&
-      (trimmed.includes("return") ||
+      trimmed.startsWith(PythonKeywords.IF + " ") &&
+      (trimmed.includes(PythonKeywords.RETURN) ||
         trimmed.includes("<=") ||
         trimmed.includes("=="))
     ) {
@@ -112,17 +110,17 @@ export function getRecursionComplexity(
 
   // If not recursive, return O(1) - the function is not adding complexity through recursion
   if (!recursionInfo.isRecursive) {
-    return "O(1)";
+    return TimeComplexityNotation.CONSTANT; // O(1)
   }
 
   // Check for factorial patterns first
   if (detectFactorial(lines, functionName)) {
-    return "O(n!)";
+    return TimeComplexityNotation.FACTORIAL; // O(n!)
   }
 
   // Check for exponential patterns
   if (detectExponential(lines, functionName)) {
-    return "O(2^n)";
+    return TimeComplexityNotation.EXPONENTIAL; // O(2^n)
   }
 
   // Linear recursion with work per call
@@ -134,20 +132,22 @@ export function getRecursionComplexity(
         !countFunctionCalls(line, functionName)
     );
 
-    return hasLinearWork ? "O(n²)" : "O(n)";
+    return hasLinearWork
+      ? TimeComplexityNotation.QUADRATIC
+      : TimeComplexityNotation.LINEAR; // O(n) or O(n²)
   }
 
   // Binary recursion (like Fibonacci)
   if (recursionInfo.recursionType === "binary") {
-    return "O(2^n)";
+    return TimeComplexityNotation.EXPONENTIAL; // O(2^n)
   }
 
   // Multiple recursion
   if (recursionInfo.recursionType === "multiple") {
-    return "O(n!)";
+    return TimeComplexityNotation.FACTORIAL; // O(n!)
   }
 
-  return "O(n)";
+  return TimeComplexityNotation.LINEAR; // O(n)
 }
 
 // Detect tail recursion (which is often O(n))
@@ -157,14 +157,14 @@ export function isTailRecursive(
 ): boolean {
   const returnLines = lines.filter(
     (line) =>
-      line.trim().startsWith("return") &&
+      line.trim().startsWith(PythonKeywords.RETURN) &&
       countFunctionCalls(line, functionName) > 0
   );
 
   // In tail recursion, the recursive call should be the last operation
   return returnLines.some((line) => {
     const trimmed = line.trim();
-    const returnIndex = trimmed.indexOf("return");
+    const returnIndex = trimmed.indexOf(PythonKeywords.RETURN);
     const callIndex = trimmed.indexOf(functionName + "(");
 
     // The function call should be directly after 'return'

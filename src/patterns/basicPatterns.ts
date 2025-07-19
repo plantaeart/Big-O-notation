@@ -1,5 +1,7 @@
 // Basic algorithmic pattern detection
 
+import { PythonKeywords } from "../constants/pythonKeyWordsConst";
+
 // Detect constant time operations
 export function detectConstantTime(line: string): boolean {
   const trimmed = line.trim();
@@ -88,16 +90,16 @@ export function detectLinear(lines: string[]): boolean {
 // Check for built-in linear operations
 export function hasLinearBuiltins(line: string): boolean {
   const linearFunctions = [
-    "sum\\(",
-    "max\\(",
-    "min\\(",
-    "len\\(",
-    "\\.count\\(",
-    "\\.index\\(",
-    "\\.remove\\(",
-    "list\\(",
-    "tuple\\(",
-    "set\\(",
+    PythonKeywords.SUM + "\\(",
+    PythonKeywords.MAX + "\\(",
+    PythonKeywords.MIN + "\\(",
+    PythonKeywords.LEN + "\\(",
+    "\\." + PythonKeywords.COUNT + "\\(",
+    "\\." + PythonKeywords.INDEX + "\\(",
+    "\\." + PythonKeywords.REMOVE + "\\(",
+    PythonKeywords.LIST + "\\(",
+    PythonKeywords.TUPLE + "\\(",
+    PythonKeywords.SET + "\\(",
   ];
 
   return linearFunctions.some((func) => new RegExp(func).test(line));

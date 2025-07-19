@@ -1,14 +1,13 @@
 import * as vscode from "vscode";
 import { analyzeCodeComplexity } from "../analysis/complexityAnalyzer";
 import { BigOWebviewProvider } from "../webview/BigOWebviewProvider";
-import { getComplexityEmoji } from "../utils/complexityHelper";
+import { getComplexityIndicator } from "../utils/complexityHelperUtils";
 import { addBigOComments } from "../comments/commentManager";
 import { applyComplexityDecorations } from "../decorations/decorationManager";
-import { compareComplexityPriority } from "../utils/complexityComparator";
+import { compareComplexityPriority } from "../utils/timeComplexityComparatorUtils";
 
 // Register the main command to analyze Python file and add Big-O comments
 export function registerAnalyzeComplexityCommand(
-  context: vscode.ExtensionContext,
   provider: BigOWebviewProvider
 ): vscode.Disposable {
   return vscode.commands.registerCommand(
@@ -48,7 +47,7 @@ export function registerAnalyzeComplexityCommand(
       await addBigOComments(activeEditor, methods);
 
       // Apply decorations to color the complexity indicators
-      applyComplexityDecorations(activeEditor, methods);
+      applyComplexityDecorations(activeEditor);
 
       vscode.window.showInformationMessage(
         `✅ Updated Big-O comments for ${methods.length} function(s)! Comments replaced with latest analysis. Check the Big-O Analysis panel for detailed results.`
@@ -58,9 +57,7 @@ export function registerAnalyzeComplexityCommand(
 }
 
 // Register command to show analysis in status bar
-export function registerShowStatusBarCommand(
-  context: vscode.ExtensionContext
-): vscode.Disposable {
+export function registerShowStatusBarCommand(): vscode.Disposable {
   return vscode.commands.registerCommand("bigONotation.showInStatusBar", () => {
     const activeEditor = vscode.window.activeTextEditor;
     if (!activeEditor || !activeEditor.document.fileName.endsWith(".py")) {
@@ -78,9 +75,9 @@ export function registerShowStatusBarCommand(
           : worst;
       }, "O(1)");
 
-      const emoji = getComplexityEmoji(worstComplexity);
+      const indicator = getComplexityIndicator(worstComplexity);
       vscode.window.showInformationMessage(
-        `${emoji} Worst case complexity: ${worstComplexity}`
+        `${indicator} Worst case complexity: ${worstComplexity}`
       );
     }
   });
@@ -88,7 +85,6 @@ export function registerShowStatusBarCommand(
 
 // Register auto-analyze when Python file is opened
 export function registerAutoAnalyzeCommand(
-  context: vscode.ExtensionContext,
   provider: BigOWebviewProvider
 ): vscode.Disposable {
   return vscode.window.onDidChangeActiveTextEditor((editor) => {

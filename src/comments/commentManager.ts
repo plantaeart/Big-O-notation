@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
 import { MethodAnalysis } from "../types";
 import {
-  getComplexityEmoji,
-  getSpaceComplexityEmoji,
-} from "../utils/complexityHelper";
+  getComplexityIndicator,
+  getSpaceComplexityIndicator,
+} from "../utils/complexityHelperUtils";
 
 // Helper function to get indentation from a line
 export function getIndentFromLine(lineText: string): string {
@@ -39,31 +39,31 @@ export async function addBigOComments(
         trimmedLine.startsWith("# Big-O:") ||
         trimmedLine.startsWith("# Time:") ||
         (trimmedLine.includes("Time:") && trimmedLine.includes("Space:")) ||
-        /^#\s*[\u{1F7E2}\u{1F7E1}\u{1F7E0}\u{1F534}\u{1F7E3}\u{26AB}\u{26AA}]/u.test(
-          trimmedLine
-        ) || // Unicode emoji patterns
-        /^#.*O\([^)]*\)/.test(trimmedLine)
+        /^#.*O\([^)]*\)/.test(trimmedLine) ||
+        /^#\s*(EXCELLENT|GOOD|FAIR|POOR|BAD|TERRIBLE|UNKNOWN)/.test(trimmedLine)
       ) {
         hasExistingComment = true;
         commentLineIndex = prevLineIndex;
       }
     }
 
-    // Create the Big-O comment with emojis
-    const timeEmoji = getComplexityEmoji(method.complexity.notation);
-    const spaceEmoji = getSpaceComplexityEmoji(method.spaceComplexity.notation);
+    // Create the Big-O comment with text indicators
+    const timeIndicator = getComplexityIndicator(method.complexity.notation);
+    const spaceIndicator = getSpaceComplexityIndicator(
+      method.spaceComplexity.notation
+    );
 
-    // Debug logging to check emoji generation
+    // Debug logging to check indicator generation
     console.log(`Generating comment for ${method.name}:`);
     console.log(
-      `  Time complexity: ${method.complexity.notation} -> ${timeEmoji}`
+      `  Time complexity: ${method.complexity.notation} -> ${timeIndicator}`
     );
     console.log(
-      `  Space complexity: ${method.spaceComplexity.notation} -> ${spaceEmoji}`
+      `  Space complexity: ${method.spaceComplexity.notation} -> ${spaceIndicator}`
     );
 
-    // Create comment with emojis
-    const bigOComment = `${indent}# ${timeEmoji} Time: ${method.complexity.notation} | ${spaceEmoji} Space: ${method.spaceComplexity.notation}`;
+    // Create comment with text indicators
+    const bigOComment = `${indent}# ${timeIndicator} Time: ${method.complexity.notation} | ${spaceIndicator} Space: ${method.spaceComplexity.notation}`;
 
     console.log(`  Generated comment: ${bigOComment}`);
 

@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
 import { MethodAnalysis } from "../types";
 import {
-  getComplexityEmoji,
-  getSpaceComplexityEmoji,
-} from "../utils/complexityHelper";
+  getComplexityIndicator,
+  getSpaceComplexityIndicator,
+} from "../utils/complexityHelperUtils";
 
 export class BigOWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "bigONotation.analysisView";
@@ -94,8 +94,9 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 gap: 8px;
             }
             
-            .complexity-emoji {
+            .complexity-indicator {
                 font-size: 1.2em;
+                font-weight: bold;
             }
             
             .complexity-text {
@@ -209,8 +210,8 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
             }
 
             function createMethodCard(method) {
-                const timeEmoji = getComplexityEmoji(method.complexity.notation);
-                const spaceEmoji = getSpaceComplexityEmoji(method.spaceComplexity.notation);
+                const timeIndicator = getComplexityIndicator(method.complexity.notation);
+                const spaceIndicator = getSpaceComplexityIndicator(method.spaceComplexity.notation);
                 
                 let dataStructuresHtml = '';
                 if (method.spaceComplexity.dataStructures && method.spaceComplexity.dataStructures.length > 0) {
@@ -226,14 +227,14 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                         <div class="method-name">\${method.name}()</div>
                         <div class="complexity-info">
                             <div class="complexity-row">
-                                <span class="complexity-emoji">\${timeEmoji}</span>
+                                <span class="complexity-indicator">\${timeIndicator}</span>
                                 <span class="complexity-text">Time: \${method.complexity.notation}</span>
                                 <span class="confidence">(\${method.complexity.confidence}% confidence)</span>
                             </div>
                             <div class="complexity-description">\${method.complexity.description}</div>
                             
                             <div class="complexity-row">
-                                <span class="complexity-emoji">\${spaceEmoji}</span>
+                                <span class="complexity-indicator">\${spaceIndicator}</span>
                                 <span class="complexity-text">Space: \${method.spaceComplexity.notation}</span>
                                 <span class="confidence">(\${method.spaceComplexity.confidence}% confidence)</span>
                             </div>
@@ -245,31 +246,31 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 \`;
             }
 
-            function getComplexityEmoji(complexity) {
-                const emojiMap = {
-                    "O(1)": "🟢",
-                    "O(log n)": "🟡", 
-                    "O(n)": "🟡",
-                    "O(n log n)": "🟠",
-                    "O(n²)": "🔴",
-                    "O(n³)": "🔴",
-                    "O(2^n)": "🟣",
-                    "O(n!)": "⚫"
+            function getComplexityIndicator(complexity) {
+                const indicatorMap = {
+                    "O(1)": "EXCELLENT",
+                    "O(log n)": "GOOD", 
+                    "O(n)": "GOOD",
+                    "O(n log n)": "FAIR",
+                    "O(n²)": "POOR",
+                    "O(n³)": "POOR",
+                    "O(2^n)": "BAD",
+                    "O(n!)": "TERRIBLE"
                 };
-                return emojiMap[complexity] || "⚪";
+                return indicatorMap[complexity] || "UNKNOWN";
             }
 
-            function getSpaceComplexityEmoji(spaceComplexity) {
-                const emojiMap = {
-                    "O(1)": "🟢",
-                    "O(log n)": "🟡",
-                    "O(n)": "🟠",
-                    "O(n²)": "🔴",
-                    "O(n³)": "🔴",
-                    "O(2^n)": "🟣",
-                    "O(n!)": "⚫"
+            function getSpaceComplexityIndicator(spaceComplexity) {
+                const indicatorMap = {
+                    "O(1)": "EXCELLENT",
+                    "O(log n)": "GOOD",
+                    "O(n)": "GOOD",
+                    "O(n²)": "POOR",
+                    "O(n³)": "POOR",
+                    "O(2^n)": "BAD",
+                    "O(n!)": "TERRIBLE"
                 };
-                return emojiMap[spaceComplexity] || "⚪";
+                return indicatorMap[spaceComplexity] || "UNKNOWN";
             }
         </script>
     </body>

@@ -1,23 +1,22 @@
-import {
-  ComplexityResult,
-  MethodAnalysis,
-  AlgorithmicPatterns,
-} from "../types";
+import { ComplexityResult, MethodAnalysis } from "../types";
 import { analyzeLoopComplexity } from "../patterns/loopPatterns";
 import { getRecursionComplexity } from "../patterns/recursionPatterns";
 import {
-  detectConstantTime,
-  detectLogarithmic,
-  detectLinear,
-  hasLinearBuiltins,
-} from "../patterns/basicPatterns";
-import {
   combineComplexities,
   complexityToNumeric,
-} from "../utils/complexityHelper";
-import { isFunctionDefinition, extractFunctionName } from "../utils/codeParser";
+} from "../utils/complexityHelperUtils";
+import {
+  isFunctionDefinition,
+  extractFunctionName,
+  extractFunctionCalls,
+} from "../utils/codeParserUtils";
 import { analyzeSpaceComplexity } from "./spaceAnalyzer";
-import { ComplexityNotation } from "../constants/complexityNotations";
+import { TimeComplexityNotation } from "../constants/timeComplexityNotationsConst";
+import { PythonKeywords } from "../constants/pythonKeyWordsConst";
+import {
+  calculateConfidence,
+  getTimeComplexityDescription,
+} from "../utils/timeComplexityUtils";
 
 // Main function to analyze code complexity
 export function analyzeCodeComplexity(code: string): MethodAnalysis[] {
@@ -55,12 +54,12 @@ export function analyzeCodeComplexity(code: string): MethodAnalysis[] {
         lineStart: methodStartLine,
         lineEnd: methodStartLine,
         complexity: {
-          notation: ComplexityNotation.CONSTANT,
+          notation: TimeComplexityNotation.CONSTANT,
           description: "Constant time",
           confidence: 100,
         },
         spaceComplexity: {
-          notation: ComplexityNotation.CONSTANT,
+          notation: TimeComplexityNotation.CONSTANT,
           description: "Constant space",
           confidence: 100,
           dataStructures: [],
@@ -123,7 +122,7 @@ export function analyzeCodeComplexity(code: string): MethodAnalysis[] {
     }
 
     // Now process this function (parent)
-    let worstCalledComplexity: string = ComplexityNotation.CONSTANT;
+    let worstCalledComplexity: string = TimeComplexityNotation.CONSTANT;
     for (const calledFunc of calledFunctions) {
       const calledMethod = methods.find((m) => m.name === calledFunc);
       if (calledMethod) {
@@ -154,7 +153,7 @@ export function analyzeCodeComplexity(code: string): MethodAnalysis[] {
       const oldComplexity = method.complexity.notation;
       method.complexity = {
         notation: worstCalledComplexity,
-        description: getComplexityDescription(worstCalledComplexity),
+        description: getTimeComplexityDescription(worstCalledComplexity),
         confidence: Math.max(method.complexity.confidence - 10, 70),
       };
       method.explanation = `Time: ${method.complexity.notation}, Space: ${method.spaceComplexity.notation} (includes function calls)`;
@@ -193,8 +192,10 @@ function analyzeMethodComplexity(
   // If function has no body or only simple statements, it's O(1)
   if (bodyLines.length === 0) {
     return {
-      notation: ComplexityNotation.CONSTANT,
-      description: getComplexityDescription(ComplexityNotation.CONSTANT),
+      notation: TimeComplexityNotation.CONSTANT,
+      description: getTimeComplexityDescription(
+        TimeComplexityNotation.CONSTANT
+      ),
       confidence: 95,
     };
   }
@@ -339,74 +340,86 @@ function analyzeMethodComplexity(
   const allSimpleOperations = bodyLines.every((line) => {
     const trimmed = line.trim();
     return (
-      trimmed.startsWith("return ") ||
-      trimmed.startsWith("if ") ||
+      trimmed.startsWith(PythonKeywords.RETURN) ||
+      trimmed.startsWith(PythonKeywords.IF) ||
       /^[a-zA-Z_]\w*\s*=/.test(trimmed) ||
       /^[a-zA-Z_]\w*\s*\[/.test(trimmed) ||
-      trimmed === "pass"
+      trimmed === PythonKeywords.PASS
     );
   });
 
   if (hasSortingPatterns || hasDivideConquer) {
     return {
-      notation: ComplexityNotation.LINEARITHMIC,
-      description: getComplexityDescription(ComplexityNotation.LINEARITHMIC),
+      notation: TimeComplexityNotation.LINEARITHMIC,
+      description: getTimeComplexityDescription(
+        TimeComplexityNotation.LINEARITHMIC
+      ),
       confidence: 85,
     };
   }
 
   if (hasLogPatterns) {
     return {
-      notation: ComplexityNotation.LOGARITHMIC,
-      description: getComplexityDescription(ComplexityNotation.LOGARITHMIC),
+      notation: TimeComplexityNotation.LOGARITHMIC,
+      description: getTimeComplexityDescription(
+        TimeComplexityNotation.LOGARITHMIC
+      ),
       confidence: 85,
     };
   }
 
   if (hasFactorialPatterns) {
     return {
-      notation: ComplexityNotation.FACTORIAL,
-      description: getComplexityDescription(ComplexityNotation.FACTORIAL),
+      notation: TimeComplexityNotation.FACTORIAL,
+      description: getTimeComplexityDescription(
+        TimeComplexityNotation.FACTORIAL
+      ),
       confidence: 85,
     };
   }
 
   if (hasCubicPatterns) {
     return {
-      notation: ComplexityNotation.CUBIC,
-      description: getComplexityDescription(ComplexityNotation.CUBIC),
+      notation: TimeComplexityNotation.CUBIC,
+      description: getTimeComplexityDescription(TimeComplexityNotation.CUBIC),
       confidence: 85,
     };
   }
 
   if (hasQuadraticPatterns) {
     return {
-      notation: ComplexityNotation.QUADRATIC,
-      description: getComplexityDescription(ComplexityNotation.QUADRATIC),
+      notation: TimeComplexityNotation.QUADRATIC,
+      description: getTimeComplexityDescription(
+        TimeComplexityNotation.QUADRATIC
+      ),
       confidence: 85,
     };
   }
 
   if (hasExponentialPatterns || hasBacktrackingPattern) {
     return {
-      notation: ComplexityNotation.EXPONENTIAL,
-      description: getComplexityDescription(ComplexityNotation.EXPONENTIAL),
+      notation: TimeComplexityNotation.EXPONENTIAL,
+      description: getTimeComplexityDescription(
+        TimeComplexityNotation.EXPONENTIAL
+      ),
       confidence: 85,
     };
   }
 
   if (hasLinearPatterns || loopLines.length === 1) {
     return {
-      notation: ComplexityNotation.LINEAR,
-      description: getComplexityDescription(ComplexityNotation.LINEAR),
+      notation: TimeComplexityNotation.LINEAR,
+      description: getTimeComplexityDescription(TimeComplexityNotation.LINEAR),
       confidence: 85,
     };
   }
 
   if (allSimpleOperations && bodyLines.length <= 5) {
     return {
-      notation: ComplexityNotation.CONSTANT,
-      description: getComplexityDescription(ComplexityNotation.CONSTANT),
+      notation: TimeComplexityNotation.CONSTANT,
+      description: getTimeComplexityDescription(
+        TimeComplexityNotation.CONSTANT
+      ),
       confidence: 90,
     };
   }
@@ -423,71 +436,9 @@ function analyzeMethodComplexity(
 
   return {
     notation: finalComplexity,
-    description: getComplexityDescription(finalComplexity),
+    description: getTimeComplexityDescription(finalComplexity),
     confidence: calculateConfidence(bodyLines, finalComplexity),
   };
-}
-
-// Extract function calls from method lines
-function extractFunctionCalls(lines: string[]): string[] {
-  const functionCalls: string[] = [];
-
-  for (const line of lines) {
-    // Look for function calls: functionName(
-    const matches = line.match(/([a-zA-Z_]\w*)\s*\(/g);
-    if (matches) {
-      for (const match of matches) {
-        const functionName = match.replace(/\s*\(/, "");
-        // Filter out built-in functions and common Python functions
-        if (!isBuiltinFunction(functionName)) {
-          functionCalls.push(functionName);
-        }
-      }
-    }
-  }
-
-  return [...new Set(functionCalls)]; // Remove duplicates
-}
-
-// Check if a function name is a built-in Python function
-function isBuiltinFunction(functionName: string): boolean {
-  const builtins = [
-    "print",
-    "len",
-    "range",
-    "sum",
-    "max",
-    "min",
-    "sorted",
-    "list",
-    "tuple",
-    "set",
-    "dict",
-    "str",
-    "int",
-    "float",
-    "bool",
-    "enumerate",
-    "zip",
-    "map",
-    "filter",
-    "append",
-    "extend",
-    "insert",
-    "remove",
-    "pop",
-    "clear",
-    "index",
-    "count",
-    "sort",
-    "reverse",
-    "copy",
-    "get",
-    "keys",
-    "values",
-    "items",
-  ];
-  return builtins.includes(functionName);
 }
 
 // Update method to include space analysis
@@ -497,92 +448,4 @@ function updateMethodWithSpaceAnalysis(
 ): void {
   method.spaceComplexity = analyzeSpaceComplexity(lines);
   method.explanation = `Time: ${method.complexity.notation}, Space: ${method.spaceComplexity.notation}`;
-}
-
-// Detect specific algorithmic patterns
-export function detectAlgorithmicPatterns(
-  lines: string[]
-): AlgorithmicPatterns {
-  const codeText = lines.join("\n").toLowerCase();
-
-  return {
-    isBinarySearch: /binary.*search|left.*right.*mid|search.*sorted/.test(
-      codeText
-    ),
-    isDivideByHalf: /\/\/\s*2|\/\s*2|\*\s*2/.test(codeText),
-    isSorting: /sort|sorted|merge_sort|quick_sort|heap_sort/.test(codeText),
-    isFactorial: /factorial|permut|arrangement|n!/.test(codeText),
-    isHashAccess: /\[.*\](?!\s*=)/.test(codeText),
-    isDirectAccess: /\[\d+\]/.test(codeText),
-    isPermutations: /permut|arrangement/.test(codeText),
-    isPowerSet: /powerset|subset|2\*\*/.test(codeText),
-    isBuiltinSort: /\.sort\(|sorted\(/.test(codeText),
-    hasExponentialLoop: /2\*\*|pow\(2|fibonacci|subset|powerset/.test(codeText),
-  };
-}
-
-// Get human-readable description for complexity
-function getComplexityDescription(complexity: string): string {
-  const descriptions: { [key: string]: string } = {
-    [ComplexityNotation.CONSTANT]: "Constant time - excellent performance",
-    [ComplexityNotation.LOGARITHMIC]:
-      "Logarithmic time - very good performance",
-    [ComplexityNotation.LINEAR]: "Linear time - good performance",
-    [ComplexityNotation.LINEARITHMIC]:
-      "Linearithmic time - acceptable performance",
-    [ComplexityNotation.QUADRATIC]:
-      "Quadratic time - poor performance for large inputs",
-    [ComplexityNotation.CUBIC]: "Cubic time - very poor performance",
-    [ComplexityNotation.EXPONENTIAL]:
-      "Exponential time - impractical for large inputs",
-    [ComplexityNotation.FACTORIAL]:
-      "Factorial time - only suitable for very small inputs",
-  };
-
-  return descriptions[complexity] || "Unknown complexity";
-}
-
-// Calculate confidence in the analysis
-function calculateConfidence(lines: string[], complexity: string): number {
-  let confidence = 50; // Base confidence
-
-  // Increase confidence for clear patterns
-  if (
-    complexity === ComplexityNotation.CONSTANT &&
-    lines.every((line) => detectConstantTime(line) || line.trim() === "")
-  ) {
-    confidence = 95;
-  } else if (
-    complexity === ComplexityNotation.LOGARITHMIC &&
-    lines.some((line) => detectLogarithmic(line))
-  ) {
-    confidence = 85;
-  } else if (complexity === ComplexityNotation.LINEAR && detectLinear(lines)) {
-    confidence = 90;
-  } else if (complexity === ComplexityNotation.QUADRATIC) {
-    const nestedLoops = lines.filter((line) =>
-      /\s+for.*in.*:/.test(line)
-    ).length;
-    confidence = nestedLoops > 0 ? 85 : 70;
-  } else if (complexity === ComplexityNotation.CUBIC) {
-    const tripleLoops = lines.filter((line) => /for.*in.*:/.test(line)).length;
-    confidence = tripleLoops >= 3 ? 90 : 75;
-  } else if (complexity === ComplexityNotation.EXPONENTIAL) {
-    const hasExponentialPatterns = lines.some((line) =>
-      /2\*\*|pow\(2|fibonacci|subset|powerset/.test(line)
-    );
-    confidence = hasExponentialPatterns ? 90 : 75;
-  } else if (complexity === ComplexityNotation.FACTORIAL) {
-    const hasFactorialPatterns = lines.some((line) =>
-      /factorial|permut|arrangement/.test(line)
-    );
-    confidence = hasFactorialPatterns ? 90 : 75;
-  }
-
-  // Decrease confidence for ambiguous cases
-  if (lines.length < 3) {
-    confidence -= 20;
-  }
-
-  return Math.max(10, Math.min(100, confidence));
 }

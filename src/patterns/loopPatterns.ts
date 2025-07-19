@@ -1,4 +1,6 @@
-import { getIndentLevel, isLoopStatement } from "../utils/codeParser";
+import { PythonKeywords } from "../constants/pythonKeyWordsConst";
+import { TimeComplexityNotation } from "../constants/timeComplexityNotationsConst";
+import { getIndentLevel, isLoopStatement } from "../utils/codeParserUtils";
 
 // Count nested loops in a function
 export function countNestedLoops(lines: string[]): number {
@@ -13,7 +15,7 @@ export function countNestedLoops(lines: string[]): number {
     if (
       trimmed === "" ||
       trimmed.startsWith("#") ||
-      trimmed.startsWith("def ")
+      trimmed.startsWith(PythonKeywords.DEF + " ")
     ) {
       continue;
     }
@@ -92,7 +94,7 @@ export function analyzeLoopComplexity(lines: string[]): string {
   // First check for built-in sorting functions
   const hasBuiltinSort = lines.some((line) => /sorted\(|\.sort\(/.test(line));
   if (hasBuiltinSort) {
-    return "O(n log n)";
+    return TimeComplexityNotation.LINEARITHMIC; // O(n log n)
   }
 
   // Check for heap sort patterns
@@ -100,7 +102,7 @@ export function analyzeLoopComplexity(lines: string[]): string {
     /heapify.*arr|heappop.*range|heappop.*len/.test(line)
   );
   if (hasHeapSort) {
-    return "O(n log n)";
+    return TimeComplexityNotation.LINEARITHMIC; // O(n log n)
   }
 
   // Check for divide and conquer sorting patterns
@@ -111,13 +113,13 @@ export function analyzeLoopComplexity(lines: string[]): string {
       (/left.*=.*\[/.test(line) && /right.*=.*\[/.test(line))
   );
   if (hasDivideConquerSort) {
-    return "O(n log n)";
+    return TimeComplexityNotation.LINEARITHMIC; // O(n log n)
   }
 
   // Check for manual sorting patterns (merge sort, quick sort)
   const hasMergeSort = lines.some((line) => /merge.*sort|merge\(/i.test(line));
   if (hasMergeSort) {
-    return "O(n log n)";
+    return TimeComplexityNotation.LINEARITHMIC; // O(n log n)
   }
 
   // Check for logarithmic patterns (binary search, halving, math operations)
@@ -140,19 +142,19 @@ export function analyzeLoopComplexity(lines: string[]): string {
 
   // Special case: if we have logarithmic patterns but no loops, it's still O(log n)
   if (hasLogarithmic) {
-    return "O(log n)";
+    return TimeComplexityNotation.LOGARITHMIC; // O(log n)
   }
 
   // Determine complexity based on nesting
   switch (nestedCount) {
     case 0:
-      return "O(1)";
+      return TimeComplexityNotation.CONSTANT; // O(1)
     case 1:
-      return "O(n)";
+      return TimeComplexityNotation.LINEAR; // O(n)
     case 2:
-      return "O(n²)";
+      return TimeComplexityNotation.QUADRATIC; // O(n²)
     case 3:
-      return "O(n³)";
+      return TimeComplexityNotation.CUBIC; // O(n³)
     default:
       return `O(n^${nestedCount})`;
   }
