@@ -29,8 +29,13 @@
         {
           "type": "webview",
           "id": "bigONotation.analysisView",
-          "name": "Big-O Analysis",
+          "name": "Big-O File Analysis",
           "when": "resourceExtname == .py"
+        },
+        {
+          "type": "webview",
+          "id": "bigONotation.fileOverviewView",
+          "name": "BIG-O Files Overview"
         }
       ]
     },

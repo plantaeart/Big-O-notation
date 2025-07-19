@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { analyzeCodeComplexity } from "../analysis/complexityAnalyzer";
 import { BigOWebviewProvider } from "../webview/BigOWebviewProvider";
+import { FileOverviewWebviewProvider } from "../webview/FileOverviewWebviewProvider";
 import { getComplexityIndicator } from "../utils/complexityHelperUtils";
 import { addBigOComments } from "../comments/commentManager";
 import { applyComplexityDecorations } from "../decorations/decorationManager";
@@ -12,6 +13,7 @@ import { MethodAnalysis } from "../models/MethodAnalysis.model";
 export async function analyzeAndUpdateFile(
   editor: vscode.TextEditor,
   provider: BigOWebviewProvider,
+  overviewProvider: FileOverviewWebviewProvider,
   showSuccessMessage: boolean = true
 ): Promise<void> {
   const document = editor.document;
@@ -30,8 +32,15 @@ export async function analyzeAndUpdateFile(
     document.fileName.split("/").pop() ||
     "Unknown file";
 
-  // Update the webview with analysis results
+  // Update both webviews with analysis results
   provider.updateAnalysis(methods, fileName, hierarchy);
+  overviewProvider.addFileAnalysis(
+    fileName,
+    document.fileName,
+    document.uri.toString(),
+    methods,
+    hierarchy
+  );
 
   if (methods.length === 0) {
     if (showSuccessMessage) {
@@ -57,7 +66,8 @@ export async function analyzeAndUpdateFile(
 
 // Register the main command to analyze Python file and add Big-O comments
 export function registerAnalyzeComplexityCommand(
-  provider: BigOWebviewProvider
+  provider: BigOWebviewProvider,
+  overviewProvider: FileOverviewWebviewProvider
 ): vscode.Disposable {
   return vscode.commands.registerCommand(
     "bigONotation.analyzeComplexity",
@@ -78,7 +88,12 @@ export function registerAnalyzeComplexityCommand(
         return;
       }
 
-      await analyzeAndUpdateFile(activeEditor, provider, true);
+      await analyzeAndUpdateFile(
+        activeEditor,
+        provider,
+        overviewProvider,
+        true
+      );
     }
   );
 }
@@ -148,7 +163,8 @@ export function registerReapplyDecorationsCommand(): vscode.Disposable {
 // Register auto-recompute on save functionality
 export function registerAutoRecomputeOnSave(
   context: vscode.ExtensionContext,
-  provider: BigOWebviewProvider
+  provider: BigOWebviewProvider,
+  overviewProvider: FileOverviewWebviewProvider
 ): void {
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(async (document) => {
@@ -179,7 +195,7 @@ export function registerAutoRecomputeOnSave(
       );
 
       // Reanalyze and update the file silently (no success message)
-      await analyzeAndUpdateFile(editor, provider, false);
+      await analyzeAndUpdateFile(editor, provider, overviewProvider, false);
 
       // Show a subtle notification
       vscode.window.setStatusBarMessage(

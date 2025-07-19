@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { analyzeCodeComplexity } from "./analysis/complexityAnalyzer";
 import { BigOWebviewProvider } from "./webview/BigOWebviewProvider";
+import { FileOverviewWebviewProvider } from "./webview/FileOverviewWebviewProvider";
 import {
   registerAnalyzeComplexityCommand,
   registerReapplyDecorationsCommand,
@@ -13,19 +14,26 @@ import { registerDecorationPersistence } from "./decorations/decorationPersisten
 export function activate(context: vscode.ExtensionContext) {
   console.log("Big-O Notation extension is now active!");
 
-  // Create webview provider
+  // Create webview providers
   const provider = new BigOWebviewProvider(context.extensionUri);
+  const overviewProvider = new FileOverviewWebviewProvider(
+    context.extensionUri
+  );
 
-  // Register webview provider
+  // Register webview providers
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       BigOWebviewProvider.viewType,
       provider
+    ),
+    vscode.window.registerWebviewViewProvider(
+      FileOverviewWebviewProvider.viewType,
+      overviewProvider
     )
   );
 
   context.subscriptions.push(
-    registerAnalyzeComplexityCommand(provider),
+    registerAnalyzeComplexityCommand(provider, overviewProvider),
     registerShowStatusBarCommand(),
     registerReapplyDecorationsCommand(),
     registerToggleAutoRecomputeCommand()
@@ -35,7 +43,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerDecorationPersistence(context);
 
   // Register auto-recompute on save functionality
-  registerAutoRecomputeOnSave(context, provider);
+  registerAutoRecomputeOnSave(context, provider, overviewProvider);
 
   // Auto-analyze when Python file is opened
   context.subscriptions.push(
@@ -48,7 +56,16 @@ export function activate(context: vscode.ExtensionContext) {
           editor.document.fileName.split("\\").pop() ||
           editor.document.fileName.split("/").pop() ||
           "Unknown file";
+
+        // Update both webviews
         provider.updateAnalysis(methods, fileName, hierarchy);
+        overviewProvider.addFileAnalysis(
+          fileName,
+          editor.document.fileName,
+          editor.document.uri.toString(),
+          methods,
+          hierarchy
+        );
       }
     })
   );
@@ -65,7 +82,16 @@ export function activate(context: vscode.ExtensionContext) {
       activeEditor.document.fileName.split("\\").pop() ||
       activeEditor.document.fileName.split("/").pop() ||
       "Unknown file";
+
+    // Update both webviews
     provider.updateAnalysis(methods, fileName, hierarchy);
+    overviewProvider.addFileAnalysis(
+      fileName,
+      activeEditor.document.fileName,
+      activeEditor.document.uri.toString(),
+      methods,
+      hierarchy
+    );
   }
 }
 
