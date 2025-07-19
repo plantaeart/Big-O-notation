@@ -13,6 +13,17 @@ export enum ComplexityNotation {
   FACTORIAL = "O(n!)",
 }
 
+export const PRIORITIES: { [key: string]: number } = {
+  [ComplexityNotation.CONSTANT]: 1,
+  [ComplexityNotation.LOGARITHMIC]: 2,
+  [ComplexityNotation.LINEAR]: 3,
+  [ComplexityNotation.LINEARITHMIC]: 4,
+  [ComplexityNotation.QUADRATIC]: 5,
+  [ComplexityNotation.CUBIC]: 6,
+  [ComplexityNotation.EXPONENTIAL]: 7,
+  [ComplexityNotation.FACTORIAL]: 8,
+};
+
 /**
  * Array of all complexity notations ordered from best to worst performance
  */

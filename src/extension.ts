@@ -2,48 +2,28 @@ import * as vscode from "vscode";
 import { analyzeCodeComplexity } from "./analysis/complexityAnalyzer";
 import { BigOWebviewProvider } from "./webview/BigOWebviewProvider";
 import {
-  formatComplexityResult,
   getComplexityEmoji,
   getSpaceComplexityEmoji,
 } from "./utils/complexityHelper";
 import { MethodAnalysis } from "./types";
-import { ComplexityNotation } from "./constants/complexityNotations";
-
-// Create decoration types for different complexity levels
-const excellentDecorationType = vscode.window.createTextEditorDecorationType({
-  color: "#22C55E", // Green
-  fontWeight: "bold",
-});
-
-const goodDecorationType = vscode.window.createTextEditorDecorationType({
-  color: "#EAB308", // Yellow
-  fontWeight: "bold",
-});
-
-const fairDecorationType = vscode.window.createTextEditorDecorationType({
-  color: "#F97316", // Orange
-  fontWeight: "bold",
-});
-
-const poorDecorationType = vscode.window.createTextEditorDecorationType({
-  color: "#EF4444", // Red
-  fontWeight: "bold",
-});
-
-const badDecorationType = vscode.window.createTextEditorDecorationType({
-  color: "#DC2626", // Dark Red
-  fontWeight: "bold",
-});
-
-const terribleDecorationType = vscode.window.createTextEditorDecorationType({
-  color: "#7F1D1D", // Very Dark Red
-  fontWeight: "bold",
-});
-
-const unknownDecorationType = vscode.window.createTextEditorDecorationType({
-  color: "#6B7280", // Gray
-  fontWeight: "bold",
-});
+import { PRIORITIES } from "./constants/complexityNotations";
+import {
+  badDecorationType,
+  excellentDecorationType,
+  fairDecorationType,
+  goodDecorationType,
+  poorDecorationType,
+  terribleDecorationType,
+} from "./decorations/textDecorations";
+import { getMatchDecorationType } from "./utils/complexityIndicatorUtils";
+import {
+  BAD,
+  EXCELLENT,
+  FAIR,
+  GOOD,
+  POOR,
+  TERRIBLE,
+} from "./constants/complexityIndicators";
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("Big-O Notation extension is now active!");
@@ -263,24 +243,24 @@ function applyComplexityDecorations(
 
     // Look for complexity indicators in comments
     if (text.trim().startsWith("#") && text.includes("Time:")) {
-      const excellentMatch = text.match(/EXCELLENT/g);
-      const goodMatch = text.match(/GOOD/g);
-      const fairMatch = text.match(/FAIR/g);
-      const poorMatch = text.match(/POOR/g);
-      const badMatch = text.match(/BAD/g);
-      const terribleMatch = text.match(/TERRIBLE/g);
+      const excellentMatch = getMatchDecorationType(text, EXCELLENT);
+      const goodMatch = getMatchDecorationType(text, GOOD);
+      const fairMatch = getMatchDecorationType(text, FAIR);
+      const poorMatch = getMatchDecorationType(text, POOR);
+      const badMatch = getMatchDecorationType(text, BAD);
+      const terribleMatch = getMatchDecorationType(text, TERRIBLE);
 
       if (excellentMatch) {
         let startIndex = 0;
         excellentMatch.forEach(() => {
-          const index = text.indexOf("EXCELLENT", startIndex);
+          const index = text.indexOf(EXCELLENT, startIndex);
           if (index !== -1) {
             const range = new vscode.Range(
               new vscode.Position(i, index),
-              new vscode.Position(i, index + "EXCELLENT".length)
+              new vscode.Position(i, index + EXCELLENT.length)
             );
             excellentRanges.push(range);
-            startIndex = index + "EXCELLENT".length;
+            startIndex = index + EXCELLENT.length;
           }
         });
       }
@@ -288,14 +268,14 @@ function applyComplexityDecorations(
       if (goodMatch) {
         let startIndex = 0;
         goodMatch.forEach(() => {
-          const index = text.indexOf("GOOD", startIndex);
+          const index = text.indexOf(GOOD, startIndex);
           if (index !== -1) {
             const range = new vscode.Range(
               new vscode.Position(i, index),
-              new vscode.Position(i, index + "GOOD".length)
+              new vscode.Position(i, index + GOOD.length)
             );
             goodRanges.push(range);
-            startIndex = index + "GOOD".length;
+            startIndex = index + GOOD.length;
           }
         });
       }
@@ -303,14 +283,14 @@ function applyComplexityDecorations(
       if (fairMatch) {
         let startIndex = 0;
         fairMatch.forEach(() => {
-          const index = text.indexOf("FAIR", startIndex);
+          const index = text.indexOf(FAIR, startIndex);
           if (index !== -1) {
             const range = new vscode.Range(
               new vscode.Position(i, index),
-              new vscode.Position(i, index + "FAIR".length)
+              new vscode.Position(i, index + FAIR.length)
             );
             fairRanges.push(range);
-            startIndex = index + "FAIR".length;
+            startIndex = index + FAIR.length;
           }
         });
       }
@@ -318,14 +298,14 @@ function applyComplexityDecorations(
       if (poorMatch) {
         let startIndex = 0;
         poorMatch.forEach(() => {
-          const index = text.indexOf("POOR", startIndex);
+          const index = text.indexOf(POOR, startIndex);
           if (index !== -1) {
             const range = new vscode.Range(
               new vscode.Position(i, index),
-              new vscode.Position(i, index + "POOR".length)
+              new vscode.Position(i, index + POOR.length)
             );
             poorRanges.push(range);
-            startIndex = index + "POOR".length;
+            startIndex = index + POOR.length;
           }
         });
       }
@@ -333,14 +313,14 @@ function applyComplexityDecorations(
       if (badMatch) {
         let startIndex = 0;
         badMatch.forEach(() => {
-          const index = text.indexOf("BAD", startIndex);
+          const index = text.indexOf(BAD, startIndex);
           if (index !== -1) {
             const range = new vscode.Range(
               new vscode.Position(i, index),
-              new vscode.Position(i, index + "BAD".length)
+              new vscode.Position(i, index + BAD.length)
             );
             badRanges.push(range);
-            startIndex = index + "BAD".length;
+            startIndex = index + BAD.length;
           }
         });
       }
@@ -348,14 +328,14 @@ function applyComplexityDecorations(
       if (terribleMatch) {
         let startIndex = 0;
         terribleMatch.forEach(() => {
-          const index = text.indexOf("TERRIBLE", startIndex);
+          const index = text.indexOf(TERRIBLE, startIndex);
           if (index !== -1) {
             const range = new vscode.Range(
               new vscode.Position(i, index),
-              new vscode.Position(i, index + "TERRIBLE".length)
+              new vscode.Position(i, index + TERRIBLE.length)
             );
             terribleRanges.push(range);
-            startIndex = index + "TERRIBLE".length;
+            startIndex = index + TERRIBLE.length;
           }
         });
       }
@@ -382,19 +362,8 @@ function compareComplexityPriority(
   complexity1: string,
   complexity2: string
 ): number {
-  const priorities: { [key: string]: number } = {
-    [ComplexityNotation.CONSTANT]: 1,
-    [ComplexityNotation.LOGARITHMIC]: 2,
-    [ComplexityNotation.LINEAR]: 3,
-    [ComplexityNotation.LINEARITHMIC]: 4,
-    [ComplexityNotation.QUADRATIC]: 5,
-    [ComplexityNotation.CUBIC]: 6,
-    [ComplexityNotation.EXPONENTIAL]: 7,
-    [ComplexityNotation.FACTORIAL]: 8,
-  };
-
-  const priority1 = priorities[complexity1] || 0;
-  const priority2 = priorities[complexity2] || 0;
+  const priority1 = PRIORITIES[complexity1] || 0;
+  const priority2 = PRIORITIES[complexity2] || 0;
 
   return priority1 - priority2;
 }
