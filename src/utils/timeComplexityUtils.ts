@@ -19,6 +19,8 @@ export function getTimeComplexityDescription(complexity: string): string {
     [TimeComplexityNotation.CUBIC]: "Cubic time - very poor performance",
     [TimeComplexityNotation.EXPONENTIAL]:
       "Exponential time - impractical for large inputs",
+    [TimeComplexityNotation.EXPONENTIAL_K]:
+      "Exponential k^n time - extremely impractical for large inputs",
     [TimeComplexityNotation.FACTORIAL]:
       "Factorial time - only suitable for very small inputs",
   };

@@ -10,6 +10,7 @@ export enum TimeComplexityNotation {
   QUADRATIC = "O(n²)",
   CUBIC = "O(n³)",
   EXPONENTIAL = "O(2^n)",
+  EXPONENTIAL_K = "O(k^n)",
   FACTORIAL = "O(n!)",
 }
 
@@ -21,5 +22,6 @@ export const TIME_COMPLEXITY_PRIORITIES: { [key: string]: number } = {
   [TimeComplexityNotation.QUADRATIC]: 5,
   [TimeComplexityNotation.CUBIC]: 6,
   [TimeComplexityNotation.EXPONENTIAL]: 7,
-  [TimeComplexityNotation.FACTORIAL]: 8,
+  [TimeComplexityNotation.EXPONENTIAL_K]: 8,
+  [TimeComplexityNotation.FACTORIAL]: 9,
 };

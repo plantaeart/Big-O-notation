@@ -258,20 +258,85 @@ function analyzeMethodComplexity(
       )
     );
 
+  // Check for O(k^n) patterns (exponential with k base, worse than 2^n)
+  const hasExponentialKPatterns = (() => {
+    const hasRecursiveCall = bodyLines.some((line) => {
+      const functionCallPattern = new RegExp(`\\b${functionName}\\s*\\(`, "g");
+      return functionCallPattern.test(line);
+    });
+
+    const hasNestedLoops = loopLines.length >= 2;
+
+    // Pattern: for item in recursive_function(): for other in collection:
+    const hasLoopOverRecursiveResult = bodyLines.some((line) => {
+      const functionCallPattern = new RegExp(
+        `for.*in\\s+${functionName}\\s*\\(`,
+        "g"
+      );
+      return functionCallPattern.test(line);
+    });
+
+    // Specific password/combination generation pattern
+    // Look for patterns where we iterate over recursive results and then over another collection
+    const hasPasswordGenerationPattern =
+      hasLoopOverRecursiveResult &&
+      bodyLines.some((line) =>
+        /for.*in\s+(characters|items|chars|alphabet)/.test(line)
+      ) &&
+      bodyLines.some((line) => /append\s*\(\s*\w+\s*\+/.test(line));
+
+    // K^n exponential pattern: recursive call with nested processing over k items
+    return (
+      hasRecursiveCall &&
+      hasNestedLoops &&
+      (hasLoopOverRecursiveResult || hasPasswordGenerationPattern)
+    );
+  })();
+
   // Check for O(2^n) patterns (exponential algorithms)
   const hasExponentialPatterns =
     bodyLines.some(
       (line) =>
         /2\*\*|pow\(2/.test(line) ||
         /range\(2\*\*/.test(line) ||
-        /2\s*\*\*\s*n/.test(line)
+        /2\s*\*\*\s*n/.test(line) ||
+        // Power set generation pattern: range(2**n) or range(2**len(...))
+        /range\s*\(\s*2\s*\*\*\s*(n|len\()/i.test(line) ||
+        // Bit manipulation patterns often indicate exponential
+        /1\s*<<\s*|<<\s*\w+/.test(line)
     ) ||
-    // Check for recursive patterns with multiple calls (like fibonacci pattern)
-    bodyLines.some((line) => {
-      // Look for patterns like "func(n-1) + func(n-2)" or "func(...) or func(...)"
-      const recursiveCalls = (line.match(/\w+\(/g) || []).length;
-      return recursiveCalls >= 2 && /\+|\|or\b/.test(line);
-    });
+    // Check for recursive patterns with multiple calls (like fibonacci, hanoi)
+    (() => {
+      // Count recursive calls to the same function
+      const recursiveCallLines = bodyLines.filter((line) => {
+        const functionCallPattern = new RegExp(
+          `\\b${functionName}\\s*\\(`,
+          "g"
+        );
+        return functionCallPattern.test(line);
+      });
+
+      // If we have multiple recursive calls or multiple calls in extend/append operations
+      const totalRecursiveCalls = recursiveCallLines.reduce((count, line) => {
+        const functionCallPattern = new RegExp(
+          `\\b${functionName}\\s*\\(`,
+          "g"
+        );
+        const matches = line.match(functionCallPattern);
+        return count + (matches ? matches.length : 0);
+      }, 0);
+
+      // Check for patterns like hanoi: moves.extend(hanoi(...)) appears twice
+      const hasMultipleExtendCalls =
+        bodyLines.filter((line) => /extend\s*\(\s*\w+\s*\(/.test(line))
+          .length >= 2;
+
+      // Classic exponential: 2 or more recursive calls total
+      return totalRecursiveCalls >= 2 || hasMultipleExtendCalls;
+    })() ||
+    // Power set generation: loops with 2^n iterations combined with nested structure
+    (bodyLines.some((line) => /range\s*\(\s*2\s*\*\*/.test(line)) &&
+      bodyLines.some((line) => /for.*range\(.*n.*\)/.test(line)));
 
   // Check for O(n!) patterns (factorial algorithms)
   const fullCode = fullCodeContext ? fullCodeContext.join(" ") : "";
@@ -351,6 +416,26 @@ function analyzeMethodComplexity(
     };
   }
 
+  if (hasExponentialKPatterns) {
+    return {
+      notation: TimeComplexityNotation.EXPONENTIAL_K,
+      description: getTimeComplexityDescription(
+        TimeComplexityNotation.EXPONENTIAL_K
+      ),
+      confidence: 85,
+    };
+  }
+
+  if (hasExponentialPatterns || hasBacktrackingPattern) {
+    return {
+      notation: TimeComplexityNotation.EXPONENTIAL,
+      description: getTimeComplexityDescription(
+        TimeComplexityNotation.EXPONENTIAL
+      ),
+      confidence: 85,
+    };
+  }
+
   if (hasCubicPatterns) {
     return {
       notation: TimeComplexityNotation.CUBIC,
@@ -364,16 +449,6 @@ function analyzeMethodComplexity(
       notation: TimeComplexityNotation.QUADRATIC,
       description: getTimeComplexityDescription(
         TimeComplexityNotation.QUADRATIC
-      ),
-      confidence: 85,
-    };
-  }
-
-  if (hasExponentialPatterns || hasBacktrackingPattern) {
-    return {
-      notation: TimeComplexityNotation.EXPONENTIAL,
-      description: getTimeComplexityDescription(
-        TimeComplexityNotation.EXPONENTIAL
       ),
       confidence: 85,
     };

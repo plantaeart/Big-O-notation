@@ -24,6 +24,7 @@ function getComplexityIndicatorInternal(complexity: string): string {
       return COMPLEXITY_INDICATOR.POOR; // Can be styled red
     case TimeComplexityNotation.EXPONENTIAL:
       return COMPLEXITY_INDICATOR.BAD; // Can be styled dark red
+    case TimeComplexityNotation.EXPONENTIAL_K:
     case TimeComplexityNotation.FACTORIAL:
       return COMPLEXITY_INDICATOR.TERRIBLE; // Can be styled dark red/black
     default:
@@ -98,7 +99,8 @@ export function complexityToNumeric(complexity: string): number {
     [TimeComplexityNotation.QUADRATIC]: 5,
     [TimeComplexityNotation.CUBIC]: 6,
     [TimeComplexityNotation.EXPONENTIAL]: 7,
-    [TimeComplexityNotation.FACTORIAL]: 8,
+    [TimeComplexityNotation.EXPONENTIAL_K]: 8,
+    [TimeComplexityNotation.FACTORIAL]: 9,
   };
   return mapping[complexity] || 0;
 }
