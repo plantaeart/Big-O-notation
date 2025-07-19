@@ -1,19 +1,67 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
+import { analyzeCodeComplexity } from "./analysis/complexityAnalyzer";
+import { BigOWebviewProvider } from "./webview/BigOWebviewProvider";
+import {
+  formatComplexityResult,
+  getComplexityEmoji,
+  getSpaceComplexityEmoji,
+} from "./utils/complexityHelper";
+import { MethodAnalysis } from "./types";
+import { ComplexityNotation } from "./constants/complexityNotations";
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+// Create decoration types for different complexity levels
+const excellentDecorationType = vscode.window.createTextEditorDecorationType({
+  color: "#22C55E", // Green
+  fontWeight: "bold",
+});
+
+const goodDecorationType = vscode.window.createTextEditorDecorationType({
+  color: "#EAB308", // Yellow
+  fontWeight: "bold",
+});
+
+const fairDecorationType = vscode.window.createTextEditorDecorationType({
+  color: "#F97316", // Orange
+  fontWeight: "bold",
+});
+
+const poorDecorationType = vscode.window.createTextEditorDecorationType({
+  color: "#EF4444", // Red
+  fontWeight: "bold",
+});
+
+const badDecorationType = vscode.window.createTextEditorDecorationType({
+  color: "#DC2626", // Dark Red
+  fontWeight: "bold",
+});
+
+const terribleDecorationType = vscode.window.createTextEditorDecorationType({
+  color: "#7F1D1D", // Very Dark Red
+  fontWeight: "bold",
+});
+
+const unknownDecorationType = vscode.window.createTextEditorDecorationType({
+  color: "#6B7280", // Gray
+  fontWeight: "bold",
+});
+
 export function activate(context: vscode.ExtensionContext) {
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
-  console.log(
-    'Congratulations, your extension "big-o-notation" is now active!'
+  console.log("Big-O Notation extension is now active!");
+
+  // Create webview provider
+  const provider = new BigOWebviewProvider(context.extensionUri);
+
+  // Register webview provider
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      BigOWebviewProvider.viewType,
+      provider
+    )
   );
 
   // Register the main command to analyze Python file and add Big-O comments
-  const analyzeAndAddComments = vscode.commands.registerCommand(
-    "big-o-notation.analyzeComplexity",
+  const analyzeComplexityCommand = vscode.commands.registerCommand(
+    "bigONotation.analyzeComplexity",
     async () => {
       const activeEditor = vscode.window.activeTextEditor;
       if (!activeEditor) {
@@ -32,52 +80,295 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const fileContent = document.getText();
-      const analysis = analyzePythonComplexity(fileContent);
+      const methods = analyzeCodeComplexity(fileContent);
 
-      if (analysis.length === 0) {
+      if (methods.length === 0) {
         vscode.window.showInformationMessage(
-          "No Python methods found in the current file."
+          "No Python functions found in the current file."
         );
+        provider.updateAnalysis([]);
         return;
       }
 
-      await addBigOComments(activeEditor, analysis);
+      // Update the webview with analysis results
+      provider.updateAnalysis(methods);
+
+      // Add comments to the code
+      await addBigOComments(activeEditor, methods);
+
+      // Apply decorations to color the complexity indicators
+      applyComplexityDecorations(activeEditor, methods);
 
       vscode.window.showInformationMessage(
-        `✅ Added Big-O comments to ${analysis.length} method(s)!`
+        `✅ Updated Big-O comments for ${methods.length} function(s)! Comments replaced with latest analysis. Check the Big-O Analysis panel for detailed results.`
       );
     }
   );
 
-  // Add command to subscriptions
-  context.subscriptions.push(analyzeAndAddComments);
+  // Register command to show analysis in status bar
+  const showStatusBarCommand = vscode.commands.registerCommand(
+    "bigONotation.showInStatusBar",
+    () => {
+      const activeEditor = vscode.window.activeTextEditor;
+      if (!activeEditor || !activeEditor.document.fileName.endsWith(".py")) {
+        return;
+      }
+
+      const fileContent = activeEditor.document.getText();
+      const methods = analyzeCodeComplexity(fileContent);
+
+      if (methods.length > 0) {
+        const worstComplexity = methods.reduce((worst, method) => {
+          const currentComplexity = method.complexity.notation;
+          return compareComplexityPriority(currentComplexity, worst) > 0
+            ? currentComplexity
+            : worst;
+        }, "O(1)");
+
+        const emoji = getComplexityEmoji(worstComplexity);
+        vscode.window.showInformationMessage(
+          `${emoji} Worst case complexity: ${worstComplexity}`
+        );
+      }
+    }
+  );
+
+  context.subscriptions.push(analyzeComplexityCommand, showStatusBarCommand);
+
+  // Auto-analyze when Python file is opened
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor && editor.document.fileName.endsWith(".py")) {
+        const methods = analyzeCodeComplexity(editor.document.getText());
+        provider.updateAnalysis(methods);
+      }
+    })
+  );
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
-
-// Function to add Big-O comments above Python methods
+// Add Big-O comments to the code
 async function addBigOComments(
   editor: vscode.TextEditor,
-  analysis: MethodAnalysis[]
+  methods: MethodAnalysis[]
 ): Promise<void> {
-  await editor.edit((editBuilder) => {
-    // Sort analysis by line number in reverse order to avoid line number shifts
-    const sortedAnalysis = analysis.sort((a, b) => b.lineStart - a.lineStart);
+  const document = editor.document;
+  const edits: vscode.TextEdit[] = [];
 
-    sortedAnalysis.forEach((method) => {
-      const lineIndex = method.lineStart - 1; // Convert to 0-based index
-      const line = editor.document.lineAt(lineIndex);
-      const indent = getIndentFromLine(line.text);
+  for (const method of methods) {
+    const lineStart = method.lineStart;
+    const line = document.lineAt(lineStart);
+    const lineText = line.text;
+    const indent = getIndentFromLine(lineText);
 
-      // Create the Big-O comment
-      const comment = `${indent}# Time Complexity: ${method.complexity.notation} - ${method.complexity.description}\n`;
+    // Check if Big-O comment already exists above the function
+    const prevLineIndex = lineStart - 1;
+    let hasExistingComment = false;
+    let commentLineIndex = prevLineIndex;
 
-      // Insert comment above the method
-      const position = new vscode.Position(lineIndex, 0);
-      editBuilder.insert(position, comment);
-    });
-  });
+    if (prevLineIndex >= 0) {
+      const prevLine = document.lineAt(prevLineIndex);
+      const trimmedLine = prevLine.text.trim();
+
+      // Check for various Big-O comment patterns
+      if (
+        trimmedLine.startsWith("# Big-O:") ||
+        trimmedLine.startsWith("# Time:") ||
+        (trimmedLine.includes("Time:") && trimmedLine.includes("Space:")) ||
+        /^#\s*[\u{1F7E2}\u{1F7E1}\u{1F7E0}\u{1F534}\u{1F7E3}\u{26AB}\u{26AA}]/u.test(
+          trimmedLine
+        ) || // Unicode emoji patterns
+        /^#.*O\([^)]*\)/.test(trimmedLine)
+      ) {
+        hasExistingComment = true;
+        commentLineIndex = prevLineIndex;
+      }
+    }
+
+    // Create the Big-O comment with emojis
+    const timeEmoji = getComplexityEmoji(method.complexity.notation);
+    const spaceEmoji = getSpaceComplexityEmoji(method.spaceComplexity.notation);
+
+    // Debug logging to check emoji generation
+    console.log(`Generating comment for ${method.name}:`);
+    console.log(
+      `  Time complexity: ${method.complexity.notation} -> ${timeEmoji}`
+    );
+    console.log(
+      `  Space complexity: ${method.spaceComplexity.notation} -> ${spaceEmoji}`
+    );
+
+    // Create comment with emojis
+    const bigOComment = `${indent}# ${timeEmoji} Time: ${method.complexity.notation} | ${spaceEmoji} Space: ${method.spaceComplexity.notation}`;
+
+    console.log(`  Generated comment: ${bigOComment}`);
+
+    if (hasExistingComment) {
+      // Replace existing comment
+      const commentLine = document.lineAt(commentLineIndex);
+      const range = new vscode.Range(
+        new vscode.Position(commentLineIndex, 0),
+        new vscode.Position(commentLineIndex, commentLine.text.length)
+      );
+
+      edits.push(vscode.TextEdit.replace(range, bigOComment));
+    } else {
+      // Add new comment before function definition
+      const position = new vscode.Position(lineStart, 0);
+      edits.push(vscode.TextEdit.insert(position, bigOComment + "\n"));
+    }
+  }
+
+  if (edits.length > 0) {
+    const workspaceEdit = new vscode.WorkspaceEdit();
+    workspaceEdit.set(document.uri, edits);
+
+    // Apply the edit
+    const success = await vscode.workspace.applyEdit(workspaceEdit);
+
+    if (!success) {
+      console.error("Failed to apply Big-O comment edits");
+      vscode.window.showErrorMessage("Failed to update Big-O comments");
+    } else {
+      console.log("Successfully applied Big-O comment edits");
+    }
+  }
+}
+
+// Apply color decorations to complexity indicators
+function applyComplexityDecorations(
+  editor: vscode.TextEditor,
+  methods: MethodAnalysis[]
+): void {
+  const document = editor.document;
+
+  // Clear existing decorations
+  editor.setDecorations(excellentDecorationType, []);
+  editor.setDecorations(goodDecorationType, []);
+  editor.setDecorations(fairDecorationType, []);
+  editor.setDecorations(poorDecorationType, []);
+  editor.setDecorations(badDecorationType, []);
+  editor.setDecorations(terribleDecorationType, []);
+
+  const excellentRanges: vscode.Range[] = [];
+  const goodRanges: vscode.Range[] = [];
+  const fairRanges: vscode.Range[] = [];
+  const poorRanges: vscode.Range[] = [];
+  const badRanges: vscode.Range[] = [];
+  const terribleRanges: vscode.Range[] = [];
+
+  // Find complexity indicators in comments
+  for (let i = 0; i < document.lineCount; i++) {
+    const line = document.lineAt(i);
+    const text = line.text;
+
+    // Look for complexity indicators in comments
+    if (text.trim().startsWith("#") && text.includes("Time:")) {
+      const excellentMatch = text.match(/EXCELLENT/g);
+      const goodMatch = text.match(/GOOD/g);
+      const fairMatch = text.match(/FAIR/g);
+      const poorMatch = text.match(/POOR/g);
+      const badMatch = text.match(/BAD/g);
+      const terribleMatch = text.match(/TERRIBLE/g);
+
+      if (excellentMatch) {
+        let startIndex = 0;
+        excellentMatch.forEach(() => {
+          const index = text.indexOf("EXCELLENT", startIndex);
+          if (index !== -1) {
+            const range = new vscode.Range(
+              new vscode.Position(i, index),
+              new vscode.Position(i, index + "EXCELLENT".length)
+            );
+            excellentRanges.push(range);
+            startIndex = index + "EXCELLENT".length;
+          }
+        });
+      }
+
+      if (goodMatch) {
+        let startIndex = 0;
+        goodMatch.forEach(() => {
+          const index = text.indexOf("GOOD", startIndex);
+          if (index !== -1) {
+            const range = new vscode.Range(
+              new vscode.Position(i, index),
+              new vscode.Position(i, index + "GOOD".length)
+            );
+            goodRanges.push(range);
+            startIndex = index + "GOOD".length;
+          }
+        });
+      }
+
+      if (fairMatch) {
+        let startIndex = 0;
+        fairMatch.forEach(() => {
+          const index = text.indexOf("FAIR", startIndex);
+          if (index !== -1) {
+            const range = new vscode.Range(
+              new vscode.Position(i, index),
+              new vscode.Position(i, index + "FAIR".length)
+            );
+            fairRanges.push(range);
+            startIndex = index + "FAIR".length;
+          }
+        });
+      }
+
+      if (poorMatch) {
+        let startIndex = 0;
+        poorMatch.forEach(() => {
+          const index = text.indexOf("POOR", startIndex);
+          if (index !== -1) {
+            const range = new vscode.Range(
+              new vscode.Position(i, index),
+              new vscode.Position(i, index + "POOR".length)
+            );
+            poorRanges.push(range);
+            startIndex = index + "POOR".length;
+          }
+        });
+      }
+
+      if (badMatch) {
+        let startIndex = 0;
+        badMatch.forEach(() => {
+          const index = text.indexOf("BAD", startIndex);
+          if (index !== -1) {
+            const range = new vscode.Range(
+              new vscode.Position(i, index),
+              new vscode.Position(i, index + "BAD".length)
+            );
+            badRanges.push(range);
+            startIndex = index + "BAD".length;
+          }
+        });
+      }
+
+      if (terribleMatch) {
+        let startIndex = 0;
+        terribleMatch.forEach(() => {
+          const index = text.indexOf("TERRIBLE", startIndex);
+          if (index !== -1) {
+            const range = new vscode.Range(
+              new vscode.Position(i, index),
+              new vscode.Position(i, index + "TERRIBLE".length)
+            );
+            terribleRanges.push(range);
+            startIndex = index + "TERRIBLE".length;
+          }
+        });
+      }
+    }
+  }
+
+  // Apply decorations
+  editor.setDecorations(excellentDecorationType, excellentRanges);
+  editor.setDecorations(goodDecorationType, goodRanges);
+  editor.setDecorations(fairDecorationType, fairRanges);
+  editor.setDecorations(poorDecorationType, poorRanges);
+  editor.setDecorations(badDecorationType, badRanges);
+  editor.setDecorations(terribleDecorationType, terribleRanges);
 }
 
 // Helper function to get indentation from a line
@@ -86,294 +377,26 @@ function getIndentFromLine(lineText: string): string {
   return match ? match[1] : "";
 }
 
-// Interface for complexity analysis results
-interface ComplexityResult {
-  notation: string;
-  description: string;
-  confidence: number;
-}
-
-interface MethodAnalysis {
-  name: string;
-  lineStart: number;
-  lineEnd: number;
-  complexity: ComplexityResult;
-  explanation: string;
-}
-
-// Function to analyze Python file and extract methods with their complexity
-function analyzePythonComplexity(fileContent: string): MethodAnalysis[] {
-  const lines = fileContent.split("\n");
-  const methods: MethodAnalysis[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-
-    // Detect function definitions
-    const functionMatch = line.match(/^def\s+(\w+)\s*\(/);
-    if (functionMatch) {
-      const methodName = functionMatch[1];
-      const startLine = i + 1; // 1-based line numbers
-
-      // Find the end of the function
-      let endLine = startLine;
-      let indentLevel = getIndentLevel(lines[i]);
-
-      for (let j = i + 1; j < lines.length; j++) {
-        const currentLine = lines[j];
-        if (currentLine.trim() === "") {
-          continue; // Skip empty lines
-        }
-
-        const currentIndent = getIndentLevel(currentLine);
-        if (currentIndent <= indentLevel && currentLine.trim() !== "") {
-          endLine = j;
-          break;
-        }
-        endLine = j + 1;
-      }
-
-      // Extract method body for analysis
-      const methodBody = lines.slice(i, endLine).join("\n");
-      const complexity = analyzeCodeComplexity(methodBody);
-
-      methods.push({
-        name: methodName,
-        lineStart: startLine,
-        lineEnd: endLine,
-        complexity: complexity,
-        explanation: generateExplanation(methodBody, complexity),
-      });
-    }
-  }
-
-  return methods;
-}
-
-// Helper function to get indentation level
-function getIndentLevel(line: string): number {
-  let indent = 0;
-  for (const char of line) {
-    if (char === " ") {
-      indent++;
-    } else if (char === "\t") {
-      indent += 4; // Count tab as 4 spaces
-    } else {
-      break;
-    }
-  }
-  return indent;
-}
-
-// Function to analyze code complexity based on simple patterns from the article
-function analyzeCodeComplexity(code: string): ComplexityResult {
-  const lowerCode = code.toLowerCase();
-
-  // Count loops
-  const forLoops = (code.match(/\bfor\b/g) || []).length;
-  const whileLoops = (code.match(/\bwhile\b/g) || []).length;
-  const totalLoops = forLoops + whileLoops;
-
-  // Check for recursion
-  const functionMatch = code.match(/def\s+(\w+)/);
-  const functionName = functionMatch ? functionMatch[1] : "";
-  const hasRecursion = functionName && code.includes(functionName + "(");
-
-  // Count recursive calls
-  const recursiveCalls = hasRecursion
-    ? (code.match(new RegExp(functionName + "\\(", "g")) || []).length - 1
-    : 0;
-
-  // Check for specific patterns
-  const hasBinarySearch =
-    lowerCode.includes("binary") ||
-    (lowerCode.includes("mid") &&
-      lowerCode.includes("left") &&
-      lowerCode.includes("right") &&
-      lowerCode.includes("while"));
-
-  const hasSorting =
-    lowerCode.includes("sorted(") ||
-    lowerCode.includes("sort()") ||
-    lowerCode.includes("merge_sort") ||
-    lowerCode.includes("quick_sort");
-
-  const hasHashAccess =
-    lowerCode.includes("dict") ||
-    (lowerCode.includes("[") &&
-      lowerCode.includes("]") &&
-      totalLoops === 0 &&
-      !hasRecursion);
-
-  // Check for array/list access without loops
-  const hasSimpleAccess =
-    (lowerCode.includes("[0]") || lowerCode.includes("arr[0]")) &&
-    totalLoops === 0 &&
-    !hasRecursion;
-
-  // Analysis based on the article's patterns:
-
-  // O(n!) - Factorial: ONLY for recursive algorithms with loops (like permutation generation)
-  // This is very specific - must have recursion AND loops AND multiple recursive calls
-  if (hasRecursion && totalLoops > 0 && recursiveCalls >= 1) {
-    return {
-      notation: "O(n!)",
-      description: "Factorial - Recursive permutation/factorial algorithm",
-      confidence: 90,
-    };
-  }
-
-  // O(n log n) - Linearithmic: Sorting algorithms (including merge sort)
-  if (
-    hasSorting ||
-    (hasRecursion &&
-      recursiveCalls >= 2 &&
-      (lowerCode.includes("merge") ||
-        lowerCode.includes("sort") ||
-        lowerCode.includes("mid") ||
-        lowerCode.includes("left") ||
-        lowerCode.includes("right")))
-  ) {
-    return {
-      notation: "O(n log n)",
-      description: "Linearithmic - Sorting operation",
-      confidence: 90,
-    };
-  }
-
-  // O(2^n) - Exponential: Multiple recursive calls (like Fibonacci, but NOT merge sort)
-  if (
-    hasRecursion &&
-    recursiveCalls >= 2 &&
-    !lowerCode.includes("merge") &&
-    !lowerCode.includes("sort") &&
-    !lowerCode.includes("left") &&
-    !lowerCode.includes("right")
-  ) {
-    return {
-      notation: "O(2^n)",
-      description: "Exponential - Multiple recursive calls",
-      confidence: 95,
-    };
-  }
-
-  // O(log n) - Logarithmic: Binary search patterns
-  if (hasBinarySearch) {
-    return {
-      notation: "O(log n)",
-      description: "Logarithmic - Binary search pattern",
-      confidence: 95,
-    };
-  }
-
-  // O(n^3) - Cubic: Three nested loops
-  if (totalLoops >= 3) {
-    return {
-      notation: "O(n³)",
-      description: "Cubic - Triple nested loops",
-      confidence: 90,
-    };
-  }
-
-  // O(n^2) - Quadratic: Two nested loops
-  if (totalLoops === 2) {
-    return {
-      notation: "O(n²)",
-      description: "Quadratic - Nested loops",
-      confidence: 85,
-    };
-  }
-
-  // O(n) - Linear: Single loop or simple recursion
-  if (totalLoops === 1) {
-    return {
-      notation: "O(n)",
-      description: "Linear - Single loop",
-      confidence: 90,
-    };
-  }
-
-  // O(n) - Linear: Simple recursion (single recursive call)
-  if (hasRecursion && recursiveCalls === 1) {
-    return {
-      notation: "O(n)",
-      description: "Linear - Simple recursion",
-      confidence: 85,
-    };
-  }
-
-  // O(1) - Constant: Simple array access
-  if (hasSimpleAccess) {
-    return {
-      notation: "O(1)",
-      description: "Constant - Direct array access",
-      confidence: 95,
-    };
-  }
-
-  // O(1) - Constant: Hash access
-  if (hasHashAccess) {
-    return {
-      notation: "O(1)",
-      description: "Constant - Hash table access",
-      confidence: 85,
-    };
-  }
-
-  // O(1) - Default: No loops, simple operations
-  return {
-    notation: "O(1)",
-    description: "Constant - Simple operations",
-    confidence: 70,
+// Compare complexity priorities (higher number = worse complexity)
+function compareComplexityPriority(
+  complexity1: string,
+  complexity2: string
+): number {
+  const priorities: { [key: string]: number } = {
+    [ComplexityNotation.CONSTANT]: 1,
+    [ComplexityNotation.LOGARITHMIC]: 2,
+    [ComplexityNotation.LINEAR]: 3,
+    [ComplexityNotation.LINEARITHMIC]: 4,
+    [ComplexityNotation.QUADRATIC]: 5,
+    [ComplexityNotation.CUBIC]: 6,
+    [ComplexityNotation.EXPONENTIAL]: 7,
+    [ComplexityNotation.FACTORIAL]: 8,
   };
+
+  const priority1 = priorities[complexity1] || 0;
+  const priority2 = priorities[complexity2] || 0;
+
+  return priority1 - priority2;
 }
 
-// Function to generate simple explanation for the complexity analysis
-function generateExplanation(
-  code: string,
-  complexity: ComplexityResult
-): string {
-  const explanations = [];
-
-  const loops = (code.match(/\b(for|while)\b/g) || []).length;
-  if (loops > 0) {
-    explanations.push(`${loops} loop(s) detected`);
-  }
-
-  const functionMatch = code.match(/def\s+(\w+)/);
-  const functionName = functionMatch ? functionMatch[1] : "";
-  const hasRecursion = functionName && code.includes(functionName + "(");
-
-  if (hasRecursion) {
-    const recursiveCalls =
-      (code.match(new RegExp(functionName + "\\(", "g")) || []).length - 1;
-    explanations.push(`Recursive calls: ${recursiveCalls}`);
-
-    if (loops > 0) {
-      explanations.push("Recursion with loops (factorial pattern)");
-    }
-  }
-
-  if (code.includes("sorted(") || code.includes("sort()")) {
-    explanations.push("Sorting operation detected");
-  }
-
-  if (code.includes("dict") || code.includes("{}")) {
-    explanations.push("Hash table usage detected");
-  }
-
-  if (
-    code.includes("binary") ||
-    (code.includes("mid") && code.includes("left") && code.includes("right"))
-  ) {
-    explanations.push("Binary search pattern detected");
-  }
-
-  if (code.includes("[0]") && loops === 0 && !hasRecursion) {
-    explanations.push("Direct array access");
-  }
-
-  return explanations.length > 0
-    ? explanations.join(", ")
-    : "Simple operations only";
-}
+export function deactivate() {}

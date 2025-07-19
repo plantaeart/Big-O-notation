@@ -14,11 +14,21 @@
   "contributes": {
     "commands": [
       {
-        "command": "big-o-notation.analyzeComplexity",
+        "command": "bigONotation.analyzeComplexity",
         "title": "Add Big-O Comments to Python Methods",
         "category": "Big-O"
       }
-    ]
+    ],
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "bigONotation.analysisView",
+          "name": "Big-O Analysis",
+          "when": "resourceExtname == .py"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
