@@ -41,11 +41,32 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor && editor.document.fileName.endsWith(".py")) {
-        const methods = analyzeCodeComplexity(editor.document.getText());
-        provider.updateAnalysis(methods);
+        const analysisResult = analyzeCodeComplexity(editor.document.getText());
+        const methods = analysisResult.methods;
+        const hierarchy = analysisResult.hierarchy;
+        const fileName =
+          editor.document.fileName.split("\\").pop() ||
+          editor.document.fileName.split("/").pop() ||
+          "Unknown file";
+        provider.updateAnalysis(methods, fileName, hierarchy);
       }
     })
   );
+
+  // Also analyze current file immediately if one is already open
+  const activeEditor = vscode.window.activeTextEditor;
+  if (activeEditor && activeEditor.document.fileName.endsWith(".py")) {
+    const analysisResult = analyzeCodeComplexity(
+      activeEditor.document.getText()
+    );
+    const methods = analysisResult.methods;
+    const hierarchy = analysisResult.hierarchy;
+    const fileName =
+      activeEditor.document.fileName.split("\\").pop() ||
+      activeEditor.document.fileName.split("/").pop() ||
+      "Unknown file";
+    provider.updateAnalysis(methods, fileName, hierarchy);
+  }
 }
 
 export function deactivate() {}

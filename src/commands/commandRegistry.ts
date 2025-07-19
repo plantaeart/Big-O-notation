@@ -6,6 +6,7 @@ import { addBigOComments } from "../comments/commentManager";
 import { applyComplexityDecorations } from "../decorations/decorationManager";
 import { compareComplexityPriority } from "../utils/timeComplexityComparatorUtils";
 import { applyAndPersistDecorations } from "../decorations/decorationPersistence";
+import { MethodAnalysis } from "../models/MethodAnalysis.model";
 
 // Shared function to analyze and update Big-O comments for a Python file
 export async function analyzeAndUpdateFile(
@@ -19,10 +20,18 @@ export async function analyzeAndUpdateFile(
   }
 
   const fileContent = document.getText();
-  const methods = analyzeCodeComplexity(fileContent);
+  const analysisResult = analyzeCodeComplexity(fileContent);
+  const methods = analysisResult.methods;
+  const hierarchy = analysisResult.hierarchy;
+
+  // Get just the filename from the full path
+  const fileName =
+    document.fileName.split("\\").pop() ||
+    document.fileName.split("/").pop() ||
+    "Unknown file";
 
   // Update the webview with analysis results
-  provider.updateAnalysis(methods);
+  provider.updateAnalysis(methods, fileName, hierarchy);
 
   if (methods.length === 0) {
     if (showSuccessMessage) {
@@ -83,32 +92,28 @@ export function registerShowStatusBarCommand(): vscode.Disposable {
     }
 
     const fileContent = activeEditor.document.getText();
-    const methods = analyzeCodeComplexity(fileContent);
+    const analysisResult = analyzeCodeComplexity(fileContent);
+    const methods = analysisResult.methods;
 
     if (methods.length > 0) {
-      const worstComplexity = methods.reduce((worst, method) => {
-        const currentComplexity = method.complexity.notation;
-        return compareComplexityPriority(currentComplexity, worst) > 0
-          ? currentComplexity
-          : worst;
-      }, "O(1)");
-
-      const indicator = getComplexityIndicator(worstComplexity);
-      vscode.window.showInformationMessage(
-        `${indicator} Worst case complexity: ${worstComplexity}`
+      const worstComplexity = methods.reduce(
+        (worst: MethodAnalysis, method: MethodAnalysis) => {
+          const currentComplexity = method.complexity.notation;
+          return compareComplexityPriority(
+            currentComplexity,
+            worst.complexity.notation
+          ) > 0
+            ? method
+            : worst;
+        }
       );
-    }
-  });
-}
 
-// Register auto-analyze when Python file is opened
-export function registerAutoAnalyzeCommand(
-  provider: BigOWebviewProvider
-): vscode.Disposable {
-  return vscode.window.onDidChangeActiveTextEditor((editor) => {
-    if (editor && editor.document.fileName.endsWith(".py")) {
-      const methods = analyzeCodeComplexity(editor.document.getText());
-      provider.updateAnalysis(methods);
+      const indicator = getComplexityIndicator(
+        worstComplexity.complexity.notation
+      );
+      vscode.window.showInformationMessage(
+        `${indicator} Worst case complexity: ${worstComplexity.complexity.notation}`
+      );
     }
   });
 }

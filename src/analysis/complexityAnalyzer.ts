@@ -20,9 +20,10 @@ import {
 import { ComplexityHierarchyManager } from "./complexityHierarchy";
 import { MethodAnalysis } from "../models/MethodAnalysis.model";
 import { ComplexityResult } from "../models/ComplexityResult.model";
+import { ComplexityAnalysisResult } from "../models/ComplexityAnalysisResult.model";
 
 // Main function to analyze code complexity
-export function analyzeCodeComplexity(code: string): MethodAnalysis[] {
+export function analyzeCodeComplexity(code: string): ComplexityAnalysisResult {
   const lines = code.split("\n");
   const methods: MethodAnalysis[] = [];
 
@@ -148,7 +149,10 @@ export function analyzeCodeComplexity(code: string): MethodAnalysis[] {
     }
   });
 
-  return methods;
+  return {
+    methods: methods,
+    hierarchy: dependencies,
+  };
 }
 
 // Analyze complexity of a single method
