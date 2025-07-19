@@ -5,6 +5,8 @@ import {
   registerAnalyzeComplexityCommand,
   registerReapplyDecorationsCommand,
   registerShowStatusBarCommand,
+  registerAutoRecomputeOnSave,
+  registerToggleAutoRecomputeCommand,
 } from "./commands/commandRegistry";
 import { registerDecorationPersistence } from "./decorations/decorationPersistence";
 
@@ -25,11 +27,15 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     registerAnalyzeComplexityCommand(provider),
     registerShowStatusBarCommand(),
-    registerReapplyDecorationsCommand()
+    registerReapplyDecorationsCommand(),
+    registerToggleAutoRecomputeCommand()
   );
 
   // Register decoration persistence to maintain colors when switching files
   registerDecorationPersistence(context);
+
+  // Register auto-recompute on save functionality
+  registerAutoRecomputeOnSave(context, provider);
 
   // Auto-analyze when Python file is opened
   context.subscriptions.push(

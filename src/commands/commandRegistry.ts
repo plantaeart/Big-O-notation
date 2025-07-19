@@ -7,6 +7,45 @@ import { applyComplexityDecorations } from "../decorations/decorationManager";
 import { compareComplexityPriority } from "../utils/timeComplexityComparatorUtils";
 import { applyAndPersistDecorations } from "../decorations/decorationPersistence";
 
+// Shared function to analyze and update Big-O comments for a Python file
+export async function analyzeAndUpdateFile(
+  editor: vscode.TextEditor,
+  provider: BigOWebviewProvider,
+  showSuccessMessage: boolean = true
+): Promise<void> {
+  const document = editor.document;
+  if (!document.fileName.endsWith(".py")) {
+    return;
+  }
+
+  const fileContent = document.getText();
+  const methods = analyzeCodeComplexity(fileContent);
+
+  // Update the webview with analysis results
+  provider.updateAnalysis(methods);
+
+  if (methods.length === 0) {
+    if (showSuccessMessage) {
+      vscode.window.showInformationMessage(
+        "No Python functions found in the current file."
+      );
+    }
+    return;
+  }
+
+  // Add comments to the code
+  await addBigOComments(editor, methods);
+
+  // Apply decorations to color the complexity indicators
+  applyComplexityDecorations(editor);
+
+  if (showSuccessMessage) {
+    vscode.window.showInformationMessage(
+      `✅ Updated Big-O comments for ${methods.length} function(s)! Comments replaced with latest analysis. Check the Big-O Analysis panel for detailed results.`
+    );
+  }
+}
+
 // Register the main command to analyze Python file and add Big-O comments
 export function registerAnalyzeComplexityCommand(
   provider: BigOWebviewProvider
@@ -30,29 +69,7 @@ export function registerAnalyzeComplexityCommand(
         return;
       }
 
-      const fileContent = document.getText();
-      const methods = analyzeCodeComplexity(fileContent);
-
-      if (methods.length === 0) {
-        vscode.window.showInformationMessage(
-          "No Python functions found in the current file."
-        );
-        provider.updateAnalysis([]);
-        return;
-      }
-
-      // Update the webview with analysis results
-      provider.updateAnalysis(methods);
-
-      // Add comments to the code
-      await addBigOComments(activeEditor, methods);
-
-      // Apply decorations to color the complexity indicators
-      applyComplexityDecorations(activeEditor);
-
-      vscode.window.showInformationMessage(
-        `✅ Updated Big-O comments for ${methods.length} function(s)! Comments replaced with latest analysis. Check the Big-O Analysis panel for detailed results.`
-      );
+      await analyzeAndUpdateFile(activeEditor, provider, true);
     }
   );
 }
@@ -118,6 +135,74 @@ export function registerReapplyDecorationsCommand(): vscode.Disposable {
       applyAndPersistDecorations(activeEditor);
       vscode.window.showInformationMessage(
         "✨ Big-O complexity decorations reapplied!"
+      );
+    }
+  );
+}
+
+// Register auto-recompute on save functionality
+export function registerAutoRecomputeOnSave(
+  context: vscode.ExtensionContext,
+  provider: BigOWebviewProvider
+): void {
+  context.subscriptions.push(
+    vscode.workspace.onDidSaveTextDocument(async (document) => {
+      // Check if auto-recompute is enabled
+      const config = vscode.workspace.getConfiguration("bigONotation");
+      const autoRecompute = config.get<boolean>("autoRecomputeOnSave", true);
+
+      if (!autoRecompute) {
+        return;
+      }
+
+      // Only process Python files
+      if (!document.fileName.endsWith(".py")) {
+        return;
+      }
+
+      // Get the editor for this document
+      const editor = vscode.window.visibleTextEditors.find(
+        (e) => e.document === document
+      );
+
+      if (!editor) {
+        return;
+      }
+
+      console.log(
+        `Recomputing Big-O complexity for saved file: ${document.fileName}`
+      );
+
+      // Reanalyze and update the file silently (no success message)
+      await analyzeAndUpdateFile(editor, provider, false);
+
+      // Show a subtle notification
+      vscode.window.setStatusBarMessage(
+        "🔄 Big-O complexity updated",
+        2000 // Show for 2 seconds
+      );
+    })
+  );
+}
+
+// Register command to toggle auto-recompute on save
+export function registerToggleAutoRecomputeCommand(): vscode.Disposable {
+  return vscode.commands.registerCommand(
+    "bigONotation.toggleAutoRecompute",
+    async () => {
+      const config = vscode.workspace.getConfiguration("bigONotation");
+      const currentValue = config.get<boolean>("autoRecomputeOnSave", true);
+      const newValue = !currentValue;
+
+      await config.update(
+        "autoRecomputeOnSave",
+        newValue,
+        vscode.ConfigurationTarget.Global
+      );
+
+      const status = newValue ? "enabled" : "disabled";
+      vscode.window.showInformationMessage(
+        `🔄 Auto-recompute on save ${status}`
       );
     }
   );
