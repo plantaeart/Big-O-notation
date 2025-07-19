@@ -70,13 +70,8 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
           break;
         }
         case "webviewReady": {
-          // Webview is ready, now send any cached data
-          if (this._fileAnalyses.size > 0) {
-            this._refreshView();
-          } else {
-            // Start scanning all Python files when the webview loads and no cached data
-            this._scanAllPythonFiles();
-          }
+          // Always start fresh scan when webview is ready, don't use cache
+          this._scanAllPythonFiles();
           break;
         }
       }
@@ -147,6 +142,9 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
 
     this._isScanning = true;
 
+    // Clear existing cache for fresh scan
+    this._fileAnalyses.clear();
+
     // Update UI to show scanning state
     if (this._view) {
       this._view.webview.postMessage({
@@ -155,10 +153,10 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      // Find all Python files in the workspace
+      // Find all Python files in the workspace, excluding common non-project directories
       const pythonFiles = await vscode.workspace.findFiles(
         "**/*.py",
-        "**/node_modules/**"
+        "**/{node_modules,__pycache__,.git,.vscode,venv,env,.env,dist,build,target,.pytest_cache,.coverage,htmlcov,docs/_build,site-packages}/**"
       );
 
       let processedFiles = 0;
