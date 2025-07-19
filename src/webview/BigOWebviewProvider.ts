@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
-import { MethodAnalysis } from "../types";
 import {
   getComplexityIndicator,
   getSpaceComplexityIndicator,
 } from "../utils/complexityHelperUtils";
+import { MethodAnalysis } from "../models/MethodAnalysis.model";
 
 export class BigOWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "bigONotation.analysisView";

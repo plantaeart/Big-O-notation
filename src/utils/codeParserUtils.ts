@@ -1,6 +1,6 @@
 // Utility functions for code parsing and analysis
 import { PythonKeywords } from "../constants/pythonKeyWordsConst";
-import { AlgorithmicPatterns } from "../types";
+import { AlgorithmicPatterns } from "../models/AlgorithmicPatterns.model";
 
 // Helper function to get indentation level
 export function getIndentLevel(line: string): number {
@@ -98,8 +98,11 @@ export function isLoopStatement(line: string): boolean {
   return false;
 }
 
-// Extract function calls from method lines
-export function extractFunctionCalls(lines: string[]): string[] {
+// Extract function calls from method lines, excluding self-calls and considering scope
+export function extractFunctionCalls(
+  lines: string[],
+  currentFunctionName: string = ""
+): string[] {
   const functionCalls: string[] = [];
 
   for (const line of lines) {
@@ -108,8 +111,11 @@ export function extractFunctionCalls(lines: string[]): string[] {
     if (matches) {
       for (const match of matches) {
         const functionName = match.replace(/\s*\(/, "");
-        // Filter out built-in functions and common Python functions
-        if (!isBuiltinFunction(functionName)) {
+        // Filter out built-in functions, common Python functions, and self-calls
+        if (
+          !isBuiltinFunction(functionName) &&
+          functionName !== currentFunctionName
+        ) {
           functionCalls.push(functionName);
         }
       }
@@ -117,6 +123,46 @@ export function extractFunctionCalls(lines: string[]): string[] {
   }
 
   return [...new Set(functionCalls)]; // Remove duplicates
+}
+
+// Extract nested function definitions and their relationships
+export function extractNestedFunctions(lines: string[]): Map<string, string[]> {
+  const nestedFunctions = new Map<string, string[]>();
+  const functionStack: { name: string; indent: number }[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const indent = getIndentLevel(line);
+
+    if (isFunctionDefinition(line)) {
+      const functionName = extractFunctionName(line);
+
+      // Remove functions from stack that are at same or higher indentation
+      while (
+        functionStack.length > 0 &&
+        functionStack[functionStack.length - 1].indent >= indent
+      ) {
+        functionStack.pop();
+      }
+
+      // If there's a parent function, this is nested
+      if (functionStack.length > 0) {
+        const parentFunction = functionStack[functionStack.length - 1].name;
+        if (!nestedFunctions.has(parentFunction)) {
+          nestedFunctions.set(parentFunction, []);
+        }
+        nestedFunctions.get(parentFunction)!.push(functionName);
+        console.log(
+          `Detected nested function: ${functionName} inside ${parentFunction}`
+        );
+      }
+
+      // Add current function to stack
+      functionStack.push({ name: functionName, indent });
+    }
+  }
+
+  return nestedFunctions;
 }
 
 // Detect specific algorithmic patterns

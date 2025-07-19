@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { MethodAnalysis } from "../types";
 import {
   excellentDecorationType,
   goodDecorationType,
@@ -15,6 +14,7 @@ import {
   getSpaceComplexityIndicator,
 } from "../utils/complexityHelperUtils";
 import { getIndentFromLine } from "../utils/codeParserUtils";
+import { MethodAnalysis } from "../models/MethodAnalysis.model";
 
 // Apply color decorations to complexity indicators
 export function applyComplexityDecorations(editor: vscode.TextEditor): void {

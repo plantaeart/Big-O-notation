@@ -1,5 +1,4 @@
 import { TimeComplexityNotation } from "../constants/timeComplexityNotationsConst";
-import { SpaceComplexityResult } from "../types";
 import { compareComplexityPriority } from "../utils/timeComplexityComparatorUtils";
 import {
   getSpaceComplexityDescription,
@@ -10,6 +9,7 @@ import {
   isRecursiveCall,
   isVariableCreation,
 } from "../utils/codeParserUtils";
+import { SpaceComplexityResult } from "../models/SpaceComplexityResult.model";
 
 // Analyze space complexity of code
 export function analyzeSpaceComplexity(lines: string[]): SpaceComplexityResult {

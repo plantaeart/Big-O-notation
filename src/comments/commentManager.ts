@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
-import { MethodAnalysis } from "../types";
 import {
   getComplexityIndicator,
   getSpaceComplexityIndicator,
 } from "../utils/complexityHelperUtils";
+import { MethodAnalysis } from "../models/MethodAnalysis.model";
 
 // Helper function to get indentation from a line
 export function getIndentFromLine(lineText: string): string {

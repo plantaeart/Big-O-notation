@@ -3,7 +3,7 @@ import {
   TimeComplexityNotation,
   TIME_COMPLEXITY_PRIORITIES,
 } from "../constants/timeComplexityNotationsConst";
-import { ComplexityResult } from "../types";
+import { ComplexityResult } from "../models/ComplexityResult.model";
 
 // Internal function to get text indicator for any complexity type
 function getComplexityIndicatorInternal(complexity: string): string {

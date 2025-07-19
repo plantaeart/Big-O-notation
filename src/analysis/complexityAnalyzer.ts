@@ -1,4 +1,3 @@
-import { ComplexityResult, MethodAnalysis } from "../types";
 import { analyzeLoopComplexity } from "../patterns/loopPatterns";
 import { getRecursionComplexity } from "../patterns/recursionPatterns";
 import {
@@ -9,6 +8,7 @@ import {
   isFunctionDefinition,
   extractFunctionName,
   extractFunctionCalls,
+  extractNestedFunctions,
 } from "../utils/codeParserUtils";
 import { analyzeSpaceComplexity } from "./spaceAnalyzer";
 import { TimeComplexityNotation } from "../constants/timeComplexityNotationsConst";
@@ -17,6 +17,9 @@ import {
   calculateConfidence,
   getTimeComplexityDescription,
 } from "../utils/timeComplexityUtils";
+import { ComplexityHierarchyManager } from "./complexityHierarchy";
+import { MethodAnalysis } from "../models/MethodAnalysis.model";
+import { ComplexityResult } from "../models/ComplexityResult.model";
 
 // Main function to analyze code complexity
 export function analyzeCodeComplexity(code: string): MethodAnalysis[] {
@@ -85,94 +88,64 @@ export function analyzeCodeComplexity(code: string): MethodAnalysis[] {
     methods.push(currentMethod);
   }
 
-  // Second pass: analyze function calls and propagate complexity
-  // Build dependency graph
-  const dependencies = new Map<string, string[]>();
+  // Second pass: analyze function calls and propagate complexity using hierarchy
+  const hierarchyManager = new ComplexityHierarchyManager();
+
+  // Add all functions to the hierarchy
   methods.forEach((method) => {
-    const methodLines = lines.slice(method.lineStart, method.lineEnd + 1);
-    const calledFunctions = extractFunctionCalls(methodLines);
-    dependencies.set(method.name, calledFunctions);
+    hierarchyManager.addFunction(
+      method.name,
+      method.complexity,
+      method.spaceComplexity
+    );
   });
 
-  // Perform topological sort to process functions in dependency order (children first)
-  const processedFunctions = new Set<string>();
-  const processingStack = new Set<string>();
+  // Build dependency graph - detect both direct calls and nested function relationships
+  const dependencies = new Map<string, string[]>();
+  const nestedFunctions = extractNestedFunctions(lines);
 
-  function processFunction(functionName: string): void {
-    if (
-      processedFunctions.has(functionName) ||
-      processingStack.has(functionName)
-    ) {
-      return; // Already processed or currently processing (circular dependency)
-    }
-
-    const method = methods.find((m) => m.name === functionName);
-    if (!method) {
-      return; // Function not found in current file
-    }
-
-    processingStack.add(functionName);
-
-    // First, process all dependencies (children)
-    const calledFunctions = dependencies.get(functionName) || [];
-    for (const calledFunc of calledFunctions) {
-      if (methods.find((m) => m.name === calledFunc)) {
-        processFunction(calledFunc);
-      }
-    }
-
-    // Now process this function (parent)
-    let worstCalledComplexity: string = TimeComplexityNotation.CONSTANT;
-    for (const calledFunc of calledFunctions) {
-      const calledMethod = methods.find((m) => m.name === calledFunc);
-      if (calledMethod) {
-        console.log(
-          `${functionName} calls ${calledFunc} (${calledMethod.complexity.notation})`
-        );
-        const currentComplexity = method.complexity.notation;
-        const calledComplexity = calledMethod.complexity.notation;
-        const combinedComplexity = combineComplexities([
-          currentComplexity,
-          calledComplexity,
-        ]);
-
-        if (
-          complexityToNumeric(combinedComplexity) >
-          complexityToNumeric(worstCalledComplexity)
-        ) {
-          worstCalledComplexity = combinedComplexity;
-        }
-      }
-    }
-
-    // Update complexity if calls to other functions make it worse
-    if (
-      complexityToNumeric(worstCalledComplexity) >
-      complexityToNumeric(method.complexity.notation)
-    ) {
-      const oldComplexity = method.complexity.notation;
-      method.complexity = {
-        notation: worstCalledComplexity,
-        description: getTimeComplexityDescription(worstCalledComplexity),
-        confidence: Math.max(method.complexity.confidence - 10, 70),
-      };
-      method.explanation = `Time: ${method.complexity.notation}, Space: ${method.spaceComplexity.notation} (includes function calls)`;
-      console.log(
-        `Updated ${functionName} complexity from ${oldComplexity} to ${worstCalledComplexity} due to function calls`
-      );
-    } else {
-      console.log(
-        `${functionName} complexity remains ${method.complexity.notation} (no update needed)`
-      );
-    }
-
-    processingStack.delete(functionName);
-    processedFunctions.add(functionName);
-  }
-
-  // Process all functions in dependency order
   methods.forEach((method) => {
-    processFunction(method.name);
+    const methodLines = lines.slice(method.lineStart, method.lineEnd + 1);
+
+    // Extract function calls (excluding self-calls)
+    const calledFunctions = extractFunctionCalls(methodLines, method.name);
+
+    // Only keep functions that exist in our current file
+    const validCalledFunctions = calledFunctions.filter((funcName) =>
+      methods.some((m) => m.name === funcName)
+    );
+
+    // Add nested functions as dependencies (parent calls nested function)
+    const nestedChildren = nestedFunctions.get(method.name) || [];
+    const validNestedChildren = nestedChildren.filter((funcName) =>
+      methods.some((m) => m.name === funcName)
+    );
+
+    // Combine direct calls and nested function calls
+    const allDependencies = [...validCalledFunctions, ...validNestedChildren];
+    dependencies.set(method.name, [...new Set(allDependencies)]);
+
+    console.log(`${method.name} dependencies: [${allDependencies.join(", ")}]`);
+  });
+
+  // Process complexity inheritance using the hierarchy
+  hierarchyManager.processComplexityInheritance(dependencies);
+
+  // Update the original methods with the final complexities
+  methods.forEach((method) => {
+    const hierarchyFunction = hierarchyManager.getFunctionComplexity(
+      method.name
+    );
+    if (hierarchyFunction) {
+      method.complexity = hierarchyFunction.timeComplexity;
+      method.spaceComplexity = hierarchyFunction.spaceComplexity;
+      method.explanation = `Time: ${method.complexity.notation}, Space: ${method.spaceComplexity.notation}`;
+
+      // Add child summary to explanation if function has children
+      if (hierarchyFunction.childFunctions.length > 0) {
+        method.explanation += ` (includes function calls)`;
+      }
+    }
   });
 
   return methods;

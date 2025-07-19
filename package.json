@@ -15,17 +15,12 @@
     "commands": [
       {
         "command": "bigONotation.analyzeComplexity",
-        "title": "Add Big-O Comments to Python Methods",
+        "title": "Analyse time and space complexity with Big-O Notation",
         "category": "Big-O"
       },
       {
         "command": "bigONotation.reapplyDecorations",
         "title": "Reapply Big-O Color Decorations",
-        "category": "Big-O"
-      },
-      {
-        "command": "bigONotation.toggleAutoRecompute",
-        "title": "Toggle Auto-Recompute on Save",
         "category": "Big-O"
       }
     ],
