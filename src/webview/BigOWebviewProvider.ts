@@ -81,13 +81,45 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 padding: 20px;
             }
             
+            .header {
+                margin-bottom: 20px;
+                padding-bottom: 15px;
+                border-bottom: 2px solid var(--vscode-panel-border);
+            }
+            
+            .header h2 {
+                margin: 0 0 10px 0;
+                color: var(--vscode-textLink-foreground);
+            }
+            
             .file-header {
                 font-size: 1.1em;
                 font-weight: bold;
                 margin-bottom: 15px;
-                padding-bottom: 8px;
-                border-bottom: 1px solid var(--vscode-panel-border);
+                padding: 10px;
+                background-color: var(--vscode-list-inactiveSelectionBackground);
+                border-radius: 6px;
+                border: 1px solid var(--vscode-panel-border);
                 color: var(--vscode-textLink-foreground);
+            }
+            
+            .analyze-button {
+                background-color: var(--vscode-button-background);
+                color: var(--vscode-button-foreground);
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.9em;
+                margin-bottom: 15px;
+                transition: background-color 0.2s;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .analyze-button:hover {
+                background-color: var(--vscode-button-hoverBackground);
             }
             
             .hierarchy-tree {
@@ -100,71 +132,57 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 padding: 6px 8px;
                 border-radius: 4px;
                 background-color: var(--vscode-list-inactiveSelectionBackground);
-                transition: background-color 0.2s;
+                border-left: 3px solid var(--vscode-panel-border);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
             }
             
-            .tree-node:hover {
-                background-color: var(--vscode-list-hoverBackground);
+            .tree-node.level-0 { 
+                border-left-color: var(--vscode-textLink-foreground);
+                background-color: var(--vscode-list-activeSelectionBackground);
+            }
+            .tree-node.level-1 { border-left-color: #22C55E; }
+            .tree-node.level-2 { border-left-color: #EAB308; }
+            .tree-node.level-3 { border-left-color: #F97316; }
+            .tree-node.level-4 { border-left-color: #EF4444; }
+            
+            .node-connector {
+                color: var(--vscode-descriptionForeground);
+                margin-right: 8px;
+                white-space: pre;
             }
             
-            .function-name {
+            .method-name {
                 font-weight: bold;
                 color: var(--vscode-symbolIcon-functionForeground);
-                margin-bottom: 4px;
+                flex: 1;
+                margin-right: 10px;
             }
             
-            .complexity-text {
-                font-size: 0.9em;
-                margin-left: 8px;
-                color: var(--vscode-descriptionForeground);
+            .method-complexity {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                font-size: 0.85em;
+                flex-shrink: 0;
             }
             
-            .complexity-indicator {
+            .complexity-badge {
                 font-weight: bold;
-                margin-right: 6px;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-size: 0.8em;
             }
             
-            .excellent { color: #22C55E; }
-            .good { color: #EAB308; }
-            .fair { color: #F97316; }
-            .poor { color: #EF4444; }
-            .bad { color: #DC2626; }
-            .terrible { color: #7F1D1D; }
-            .unknown { color: #6B7280; }
-            
-            .child-node {
-                margin-left: 24px;
-                position: relative;
-            }
-            
-            .child-node:before {
-                content: "├─ ";
-                color: var(--vscode-tree-indentGuidesStroke);
-                position: absolute;
-                left: -24px;
-                font-weight: normal;
-            }
-            
-            .child-node:last-child:before {
-                content: "└─ ";
-            }
-            
-            .analyze-button {
-                background-color: var(--vscode-button-background);
-                color: var(--vscode-button-foreground);
-                border: none;
-                padding: 10px 20px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 1em;
-                margin-bottom: 20px;
-                width: 100%;
-                transition: background-color 0.2s;
-            }
-            
-            .analyze-button:hover {
-                background-color: var(--vscode-button-hoverBackground);
-            }
+            .complexity-badge.excellent { background-color: #22C55E; color: white; }
+            .complexity-badge.good { background-color: #EAB308; color: white; }
+            .complexity-badge.fair { background-color: #F97316; color: white; }
+            .complexity-badge.poor { background-color: #EF4444; color: white; }
+            .complexity-badge.bad { background-color: #DC2626; color: white; }
+            .complexity-badge.terrible { background-color: #7F1D1D; color: white; }
+            .complexity-badge.unknown { background-color: #6B7280; color: white; }
             
             .no-analysis {
                 text-align: center;
@@ -175,16 +193,18 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
         </style>
     </head>
     <body>
-        <div class="analysis-container">
-            <button class="analyze-button" onclick="analyzeCode()">
-                🔍 Analyze Current File
-            </button>
-            
-            <div id="fileHeader" style="display: none;"></div>
-            <div id="results">
-                <div class="no-analysis">
-                    Open a Python file to see Big O complexity analysis
-                </div>
+        <div class="header">
+            <h2>📊 Big O Analysis</h2>
+        </div>
+        
+        <button class="analyze-button" onclick="analyzeCode()">
+            🔍 Analyze Current File
+        </button>
+        
+        <div id="fileHeader" style="display: none;"></div>
+        <div id="results">
+            <div class="no-analysis">
+                Open a Python file to see Big O complexity analysis
             </div>
         </div>
 
@@ -211,6 +231,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 if (fileName) {
                     fileHeaderDiv.innerHTML = fileName;
                     fileHeaderDiv.style.display = 'block';
+                    fileHeaderDiv.className = 'file-header';
                 } else {
                     fileHeaderDiv.style.display = 'none';
                 }
@@ -225,7 +246,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 const hierarchyTree = buildHierarchyTree(methods, hierarchyMap);
                 
                 resultsDiv.innerHTML = '<div class="hierarchy-tree">' + 
-                    hierarchyTree.map(node => renderTreeNode(node, 0)).join('') + 
+                    renderHierarchyTree(hierarchyTree) + 
                     '</div>';
             }
 
@@ -248,8 +269,6 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 }
 
                 // For functions with multiple parents, choose the most appropriate parent
-                // Priority: lexically nested functions stay with lexical parent, 
-                // otherwise choose the parent with higher complexity
                 const finalChildrenMap = new Map();
                 const assignedChildren = new Set();
 
@@ -263,8 +282,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                             return true;
                         }
                         
-                        // For multiple parents, assign to the one with higher complexity
-                        // or first encountered for now (could be improved with more logic)
+                        // For multiple parents, assign to the first encountered
                         const isFirstEncounter = !assignedChildren.has(child);
                         if (isFirstEncounter) {
                             assignedChildren.add(child);
@@ -302,33 +320,37 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 };
             }
 
-            function renderTreeNode(node, level) {
+            function renderHierarchyTree(nodes) {
+                return nodes.map(node => renderTreeNode(node)).join('');
+            }
+
+            function renderTreeNode(node) {
+                const indent = '　'.repeat(node.level * 2); // Use full-width space for indentation
+                const connector = node.level > 0 ? '└─ ' : '';
                 const method = node.method;
-                const timeIndicator = getComplexityIndicator(method.complexity.notation);
-                const spaceIndicator = getComplexityIndicator(method.spaceComplexity.notation);
-                const timeClass = getComplexityClass(timeIndicator);
-                const spaceClass = getComplexityClass(spaceIndicator);
                 
-                let html = \`
-                    <div class="tree-node \${level > 0 ? 'child-node' : ''}">
-                        <div class="function-name">\${method.name}</div>
-                        <div class="complexity-text">
-                            <span class="complexity-indicator \${timeClass}">\${timeIndicator}</span>
+                let result = \`
+                    <div class="tree-node level-\${node.level}">
+                        <span class="node-connector">\${indent}\${connector}</span>
+                        <span class="method-name">\${escapeHtml(method.name)}</span>
+                        <div class="method-complexity">
+                            <span class="complexity-badge \${getComplexityClass(method.complexity.notation)}">
+                                \${getComplexityIndicator(method.complexity.notation)}
+                            </span>
                             Time: \${method.complexity.notation}
-                        </div>
-                        <div class="complexity-text">
-                            <span class="complexity-indicator \${spaceClass}">\${spaceIndicator}</span>
+                            <span class="complexity-badge \${getComplexityClass(method.spaceComplexity.notation)}">
+                                \${getComplexityIndicator(method.spaceComplexity.notation)}
+                            </span>
                             Space: \${method.spaceComplexity.notation}
                         </div>
                     </div>
                 \`;
-
-                // Add children
+                
                 if (node.children && node.children.length > 0) {
-                    html += node.children.map(child => renderTreeNode(child, level + 1)).join('');
+                    result += node.children.map(child => renderTreeNode(child)).join('');
                 }
-
-                return html;
+                
+                return result;
             }
 
             function getComplexityIndicator(complexity) {
@@ -346,8 +368,25 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 return indicatorMap[complexity] || "UNKNOWN";
             }
 
-            function getComplexityClass(indicator) {
-                return indicator.toLowerCase();
+            function getComplexityClass(complexity) {
+                const classMap = {
+                    "O(1)": "excellent",
+                    "O(log n)": "good",
+                    "O(n)": "good",
+                    "O(n log n)": "fair",
+                    "O(n²)": "poor",
+                    "O(n³)": "poor",
+                    "O(2^n)": "bad",
+                    "O(k^n)": "terrible",
+                    "O(n!)": "terrible"
+                };
+                return classMap[complexity] || "unknown";
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
             }
         </script>
     </body>
