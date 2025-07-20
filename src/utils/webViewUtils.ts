@@ -689,24 +689,6 @@ export async function extractFunctionCode(
 }
 
 /**
- * Get complexity indicator text (EXCELLENT, GOOD, etc.)
- */
-export function getComplexityIndicator(complexity: string): string {
-  const indicatorMap: { [key: string]: string } = {
-    "O(1)": "EXCELLENT",
-    "O(log n)": "GOOD",
-    "O(n)": "GOOD",
-    "O(n log n)": "FAIR",
-    "O(n²)": "POOR",
-    "O(n³)": "POOR",
-    "O(2^n)": "BAD",
-    "O(k^n)": "TERRIBLE",
-    "O(n!)": "TERRIBLE",
-  };
-  return indicatorMap[complexity] || "UNKNOWN";
-}
-
-/**
  * Get complexity CSS class for styling
  */
 export function getComplexityClass(complexity: string): string {

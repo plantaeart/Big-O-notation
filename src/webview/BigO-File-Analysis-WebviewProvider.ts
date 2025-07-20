@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import { MethodAnalysis } from "../models/MethodAnalysis.model";
 import {
   navigateToFunction,
-  getComplexityIndicator,
   getComplexityClass,
   improveFunctionRating,
   extractFunctionCode,
@@ -10,6 +9,8 @@ import {
   TREE_NODE_STYLES,
   COMMON_WEBVIEW_SCRIPTS,
 } from "../utils/webViewUtils";
+
+import { getComplexityIndicator } from "../utils/complexityHelperUtils";
 
 export class BigOWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "bigONotation.analysisView";

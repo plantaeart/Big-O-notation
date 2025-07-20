@@ -4,7 +4,6 @@ import { analyzeCodeComplexity } from "../analysis/complexityAnalyzer";
 import {
   navigateToFunction,
   navigateToFile,
-  getComplexityIndicator,
   getComplexityClass,
   findWorstComplexity,
   sortFilesByComplexity,
@@ -15,6 +14,8 @@ import {
   COMMON_WEBVIEW_SCRIPTS,
   WEBVIEW_STYLES,
 } from "../utils/webViewUtils";
+
+import { getComplexityIndicator } from "../utils/complexityHelperUtils";
 
 interface FileAnalysis {
   fileName: string;
