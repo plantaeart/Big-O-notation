@@ -70,8 +70,14 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
           break;
         }
         case "webviewReady": {
-          // Always start fresh scan when webview is ready, don't use cache
-          this._scanAllPythonFiles();
+          // Check if we have cached data, if so use it, otherwise scan
+          if (this._fileAnalyses.size > 0) {
+            // We have cached data, just refresh the view
+            this._refreshView();
+          } else {
+            // No cached data, perform a fresh scan (don't clear cache since it's already empty)
+            this._scanAllPythonFiles(false);
+          }
           break;
         }
       }
@@ -135,15 +141,17 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  public async _scanAllPythonFiles() {
+  public async _scanAllPythonFiles(clearCache: boolean = true) {
     if (this._isScanning) {
       return;
     }
 
     this._isScanning = true;
 
-    // Clear existing cache for fresh scan
-    this._fileAnalyses.clear();
+    // Clear existing cache for fresh scan (only if requested)
+    if (clearCache) {
+      this._fileAnalyses.clear();
+    }
 
     // Update UI to show scanning state
     if (this._view) {
