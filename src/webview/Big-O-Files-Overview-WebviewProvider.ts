@@ -1,6 +1,18 @@
 import * as vscode from "vscode";
 import { MethodAnalysis } from "../models/MethodAnalysis.model";
 import { analyzeCodeComplexity } from "../analysis/complexityAnalyzer";
+import {
+  navigateToFunction,
+  navigateToFile,
+  getComplexityIndicator,
+  getComplexityClass,
+  findWorstComplexity,
+  sortFilesByComplexity,
+  COMPLEXITY_BADGE_STYLES,
+  TREE_NODE_STYLES,
+  COMMON_WEBVIEW_SCRIPTS,
+  WEBVIEW_STYLES,
+} from "../utils/webViewUtils";
 
 interface FileAnalysis {
   fileName: string;
@@ -62,11 +74,11 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
           break;
         }
         case "navigateToFile": {
-          this._navigateToFile(data.fileUri);
+          navigateToFile(data.fileUri);
           break;
         }
         case "navigateToFunction": {
-          this._navigateToFunction(data.fileUri, data.functionName);
+          navigateToFunction(data.fileUri, data.functionName);
           break;
         }
         case "webviewReady": {
@@ -82,63 +94,6 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
         }
       }
     });
-  }
-
-  private async _navigateToFile(fileUri: string) {
-    try {
-      console.log("Navigating to file URI:", fileUri);
-
-      // Parse the URI and open the file
-      const uri = vscode.Uri.parse(fileUri);
-      const document = await vscode.workspace.openTextDocument(uri);
-      await vscode.window.showTextDocument(document);
-    } catch (error) {
-      console.error(`Error opening file ${fileUri}:`, error);
-      vscode.window.showErrorMessage(`Failed to open file: ${error}`);
-    }
-  }
-
-  private async _navigateToFunction(fileUri: string, functionName: string) {
-    try {
-      console.log(
-        "Navigating to function:",
-        functionName,
-        "in file URI:",
-        fileUri
-      );
-
-      const uri = vscode.Uri.parse(fileUri);
-      const document = await vscode.workspace.openTextDocument(uri);
-
-      // Search for the function definition in the document
-      const text = document.getText();
-      const lines = text.split("\n");
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        // Look for function definition patterns
-        if (
-          line.includes(`def ${functionName}(`) ||
-          line.includes(`def ${functionName} (`)
-        ) {
-          // Open and jump to specific line (using 0-based line number for Range)
-          const range = new vscode.Range(i, 0, i, 0);
-          await vscode.window.showTextDocument(document, {
-            selection: range,
-          });
-          return;
-        }
-      }
-
-      // If function not found, just open the file
-      await vscode.window.showTextDocument(document);
-    } catch (error) {
-      console.error(
-        `Error navigating to function ${functionName} in ${fileUri}:`,
-        error
-      );
-      vscode.window.showErrorMessage(`Failed to open file: ${error}`);
-    }
   }
 
   public async _scanAllPythonFiles(clearCache: boolean = true) {
@@ -244,8 +199,8 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     // Find worst complexities
-    const worstTime = this._findWorstComplexity(methods, "time");
-    const worstSpace = this._findWorstComplexity(methods, "space");
+    const worstTime = findWorstComplexity(methods, "time");
+    const worstSpace = findWorstComplexity(methods, "space");
 
     this._fileAnalyses.set(filePath, {
       fileName,
@@ -271,41 +226,6 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
     this._refreshView();
   }
 
-  private _findWorstComplexity(
-    methods: MethodAnalysis[],
-    type: "time" | "space"
-  ): string {
-    const complexityPriority: { [key: string]: number } = {
-      "O(1)": 1,
-      "O(log n)": 2,
-      "O(n)": 3,
-      "O(n log n)": 4,
-      "O(n²)": 5,
-      "O(n³)": 6,
-      "O(2^n)": 7,
-      "O(k^n)": 8,
-      "O(n!)": 9,
-    };
-
-    let worstComplexity = "O(1)";
-    let worstPriority = 0;
-
-    for (const method of methods) {
-      const complexity =
-        type === "time"
-          ? method.complexity.notation
-          : method.spaceComplexity.notation;
-
-      const priority = complexityPriority[complexity] || 0;
-      if (priority > worstPriority) {
-        worstPriority = priority;
-        worstComplexity = complexity;
-      }
-    }
-
-    return worstComplexity;
-  }
-
   private _calculateStats(): OverviewStats {
     const stats: OverviewStats = {
       totalMethods: 0,
@@ -321,9 +241,7 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
       stats.totalMethods += fileAnalysis.methods.length;
 
       for (const method of fileAnalysis.methods) {
-        const indicator = this._getComplexityIndicator(
-          method.complexity.notation
-        );
+        const indicator = getComplexityIndicator(method.complexity.notation);
         switch (indicator) {
           case "EXCELLENT":
             stats.excellentMethods++;
@@ -350,64 +268,13 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
     return stats;
   }
 
-  private _getComplexityIndicator(complexity: string): string {
-    const indicatorMap: { [key: string]: string } = {
-      "O(1)": "EXCELLENT",
-      "O(log n)": "GOOD",
-      "O(n)": "GOOD",
-      "O(n log n)": "FAIR",
-      "O(n²)": "POOR",
-      "O(n³)": "POOR",
-      "O(2^n)": "BAD",
-      "O(k^n)": "TERRIBLE",
-      "O(n!)": "TERRIBLE",
-    };
-    return indicatorMap[complexity] || "UNKNOWN";
-  }
-
-  private _sortFiles(files: FileAnalysis[], sortBy: string): FileAnalysis[] {
-    const complexityPriority: { [key: string]: number } = {
-      "O(1)": 1,
-      "O(log n)": 2,
-      "O(n)": 3,
-      "O(n log n)": 4,
-      "O(n²)": 5,
-      "O(n³)": 6,
-      "O(2^n)": 7,
-      "O(k^n)": 8,
-      "O(n!)": 9,
-    };
-
-    switch (sortBy) {
-      case "alphabetic":
-        return files.sort((a, b) => a.fileName.localeCompare(b.fileName));
-
-      case "worstToBest":
-        return files.sort((a, b) => {
-          const aPriority = complexityPriority[a.worstTimeComplexity] || 0;
-          const bPriority = complexityPriority[b.worstTimeComplexity] || 0;
-          return bPriority - aPriority; // Descending (worst first)
-        });
-
-      case "bestToWorst":
-        return files.sort((a, b) => {
-          const aPriority = complexityPriority[a.worstTimeComplexity] || 0;
-          const bPriority = complexityPriority[b.worstTimeComplexity] || 0;
-          return aPriority - bPriority; // Ascending (best first)
-        });
-
-      default:
-        return files;
-    }
-  }
-
   private _refreshView(sortBy: string = "alphabetic") {
     if (!this._view) {
       return;
     }
 
     const files = Array.from(this._fileAnalyses.values());
-    const sortedFiles = this._sortFiles(files, sortBy);
+    const sortedFiles = sortFilesByComplexity(files, sortBy);
     const stats = this._calculateStats();
 
     // Convert hierarchy maps to arrays for serialization
@@ -432,25 +299,7 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Files Overview</title>
         <style>
-            body {
-                font-family: var(--vscode-font-family);
-                font-size: var(--vscode-font-size);
-                color: var(--vscode-foreground);
-                background-color: var(--vscode-editor-background);
-                margin: 0;
-                padding: 20px;
-            }
-            
-            .header {
-                margin-bottom: 20px;
-                padding-bottom: 15px;
-                border-bottom: 2px solid var(--vscode-panel-border);
-            }
-            
-            .header h2 {
-                margin: 0 0 10px 0;
-                color: var(--vscode-textLink-foreground);
-            }
+${WEBVIEW_STYLES}
             
             .stats-grid {
                 display: grid;
@@ -586,18 +435,6 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
                 border-left: 3px solid var(--vscode-panel-border);
             }
             
-            .method-name {
-                font-weight: bold;
-                margin-bottom: 4px;
-                color: var(--vscode-symbolIcon-functionForeground);
-            }
-            
-            .method-complexity {
-                font-size: 0.85em;
-                display: flex;
-                gap: 15px;
-            }
-            
             .scan-button {
                 background-color: var(--vscode-button-background);
                 color: var(--vscode-button-foreground);
@@ -645,115 +482,11 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
                 transition: width 0.3s ease;
                 border-radius: 3px;
             }
-            
-            .file-name {
-                font-weight: bold;
-                font-size: 1.1em;
-                margin-bottom: 8px;
-                color: var(--vscode-textLink-foreground);
-                cursor: pointer;
-                transition: color 0.2s;
-                display: inline-block;
-                max-width: fit-content;
-            }
-            
-            .file-name:hover {
-                color: var(--vscode-textLink-activeForeground);
-                text-decoration: underline;
-            }
-            
-            .file-stats {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-                font-size: 0.9em;
-            }
-            
-            .file-stat {
-                display: flex;
-                align-items: center;
-                gap: 5px;
-            }
-            
-            .complexity-badge {
-                font-weight: bold;
-                padding: 2px 6px;
-                border-radius: 3px;
-                font-size: 0.8em;
-            }
-            
-            .complexity-badge.excellent { background-color: #22C55E; color: white; }
-            .complexity-badge.good { background-color: #EAB308; color: white; }
-            .complexity-badge.fair { background-color: #F97316; color: white; }
-            .complexity-badge.poor { background-color: #EF4444; color: white; }
-            .complexity-badge.bad { background-color: #DC2626; color: white; }
-            .complexity-badge.terrible { background-color: #7F1D1D; color: white; }
-            
-            .hierarchy-tree {
-                font-family: 'Courier New', monospace;
-                line-height: 1.5;
-            }
-            
-            .tree-node {
-                margin: 3px 0;
-                padding: 6px 8px;
-                border-radius: 4px;
-                background-color: var(--vscode-list-inactiveSelectionBackground);
-                border-left: 3px solid var(--vscode-panel-border);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex-wrap: wrap;
-            }
-            
-            .tree-node.level-0 { 
-                border-left-color: var(--vscode-textLink-foreground);
-                background-color: var(--vscode-list-activeSelectionBackground);
-            }
-            .tree-node.level-1 { border-left-color: #22C55E; }
-            .tree-node.level-2 { border-left-color: #EAB308; }
-            .tree-node.level-3 { border-left-color: #F97316; }
-            .tree-node.level-4 { border-left-color: #EF4444; }
-            
-            .node-connector {
-                color: var(--vscode-descriptionForeground);
-                margin-right: 8px;
-                white-space: pre;
-            }
-            
-            .method-name {
-                font-weight: bold;
-                color: var(--vscode-symbolIcon-functionForeground);
-                flex: 1;
-                margin-right: 10px;
-                cursor: pointer;
-                transition: color 0.2s;
-            }
-            
-            .method-name:hover {
-                color: var(--vscode-textLink-activeForeground);
-                text-decoration: underline;
-            }
-            
-            .method-complexity {
-                display: flex;
-                gap: 8px;
-                align-items: center;
-                font-size: 0.85em;
-                flex-shrink: 0;
-            }
-            
-            .no-files {
-                text-align: center;
-                color: var(--vscode-descriptionForeground);
-                font-style: italic;
-                margin-top: 40px;
-            }
         </style>
     </head>
     <body>
         <div class="header">
-            <h2>📊 Python Files Overview</h2>
+            <h2>📊 Big O - Files Overview</h2>
         </div>
         
         <button class="scan-button" id="scanButton" onclick="scanAllFiles()">
@@ -980,45 +713,7 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
                 vscode.postMessage({ type: 'navigateToFile', fileUri: fileUri });
             }
 
-            function navigateToFunction(fileUri, functionName) {
-                vscode.postMessage({ type: 'navigateToFunction', fileUri: fileUri, functionName: functionName });
-            }
-
-            function escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
-
-            function getComplexityClass(complexity) {
-                const classMap = {
-                    "O(1)": "excellent",
-                    "O(log n)": "good",
-                    "O(n)": "good",
-                    "O(n log n)": "fair",
-                    "O(n²)": "poor",
-                    "O(n³)": "poor",
-                    "O(2^n)": "bad",
-                    "O(k^n)": "terrible",
-                    "O(n!)": "terrible"
-                };
-                return classMap[complexity] || "unknown";
-            }
-
-            function getComplexityIndicator(complexity) {
-                const indicatorMap = {
-                    "O(1)": "EXCELLENT",
-                    "O(log n)": "GOOD",
-                    "O(n)": "GOOD",
-                    "O(n log n)": "FAIR",
-                    "O(n²)": "POOR",
-                    "O(n³)": "POOR",
-                    "O(2^n)": "BAD",
-                    "O(k^n)": "TERRIBLE",
-                    "O(n!)": "TERRIBLE"
-                };
-                return indicatorMap[complexity] || "UNKNOWN";
-            }
+            ${COMMON_WEBVIEW_SCRIPTS}
 
             function buildHierarchyTree(methods, hierarchyMap) {
                 const methodMap = new Map(methods.map(m => [m.name, m]));
@@ -1101,8 +796,10 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
                 
                 let result = \`
                     <div class="tree-node level-\${node.level}">
-                        <span class="node-connector">\${indent}\${connector}</span>
-                        <span class="method-name" onclick="navigateToFunction('\${escapeHtml(method.fileUri || '')}\', '\${escapeHtml(method.name)}')">\${escapeHtml(method.name)}</span>
+                        <div class="method-header">
+                            <span class="node-connector">\${indent}\${connector}</span>
+                            <span class="method-name" onclick="navigateToFunction('\${escapeHtml(method.fileUri || '')}\', '\${escapeHtml(method.name)}')">\${escapeHtml(method.name)}</span>
+                        </div>
                         <div class="method-complexity">
                             <span class="complexity-badge \${getComplexityClass(method.complexity.notation)}">
                                 \${getComplexityIndicator(method.complexity.notation)}

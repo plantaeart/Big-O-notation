@@ -1,5 +1,13 @@
 import * as vscode from "vscode";
 import { MethodAnalysis } from "../models/MethodAnalysis.model";
+import {
+  navigateToFunction,
+  getComplexityIndicator,
+  getComplexityClass,
+  COMPLEXITY_BADGE_STYLES,
+  TREE_NODE_STYLES,
+  COMMON_WEBVIEW_SCRIPTS,
+} from "../utils/webViewUtils";
 
 export class BigOWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "bigONotation.analysisView";
@@ -47,6 +55,10 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
           vscode.commands.executeCommand("bigONotation.analyzeComplexity");
           break;
         }
+        case "navigateToFunction": {
+          navigateToFunction(data.fileUri, data.functionName);
+          break;
+        }
         case "webviewReady": {
           // Webview is ready, check if we should show cached data
           const activeEditor = vscode.window.activeTextEditor;
@@ -74,6 +86,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 type: "updateAnalysis",
                 methods: fileAnalysis.methods,
                 fileName: fileAnalysis.fileName,
+                fileUri: activeEditor.document.uri.toString(),
                 hierarchy: fileAnalysis.hierarchy
                   ? Array.from(fileAnalysis.hierarchy.entries())
                   : [],
@@ -84,6 +97,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 type: "updateAnalysis",
                 methods: [],
                 fileName: currentFileName,
+                fileUri: activeEditor.document.uri.toString(),
                 hierarchy: [],
               });
             }
@@ -93,6 +107,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
               type: "updateAnalysis",
               methods: [],
               fileName: undefined,
+              fileUri: undefined,
               hierarchy: [],
             });
           }
@@ -128,6 +143,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
         type: "updateAnalysis",
         methods: methods,
         fileName: fileName,
+        fileUri: activeEditor.document.uri.toString(),
         hierarchy: hierarchy ? Array.from(hierarchy.entries()) : [],
       });
     }
@@ -222,6 +238,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
         type: "updateAnalysis",
         methods: [],
         fileName: undefined,
+        fileUri: undefined,
         hierarchy: [],
       });
       return;
@@ -236,6 +253,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
         type: "updateAnalysis",
         methods: fileAnalysis.methods,
         fileName: fileAnalysis.fileName,
+        fileUri: editor.document.uri.toString(),
         hierarchy: fileAnalysis.hierarchy
           ? Array.from(fileAnalysis.hierarchy.entries())
           : [],
@@ -250,6 +268,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
         type: "updateAnalysis",
         methods: [],
         fileName: currentFileName,
+        fileUri: editor.document.uri.toString(),
         hierarchy: [],
       });
     }
@@ -261,7 +280,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Big O Analysis</title>
+        <title>Big O - File Analysis</title>
         <style>
             body {
                 font-family: var(--vscode-font-family);
@@ -313,67 +332,9 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 background-color: var(--vscode-button-hoverBackground);
             }
             
-            .hierarchy-tree {
-                font-family: 'Courier New', monospace;
-                line-height: 1.5;
-            }
+            ${TREE_NODE_STYLES}
             
-            .tree-node {
-                margin: 3px 0;
-                padding: 6px 8px;
-                border-radius: 4px;
-                background-color: var(--vscode-list-inactiveSelectionBackground);
-                border-left: 3px solid var(--vscode-panel-border);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex-wrap: wrap;
-            }
-            
-            .tree-node.level-0 { 
-                border-left-color: var(--vscode-textLink-foreground);
-                background-color: var(--vscode-list-activeSelectionBackground);
-            }
-            .tree-node.level-1 { border-left-color: #22C55E; }
-            .tree-node.level-2 { border-left-color: #EAB308; }
-            .tree-node.level-3 { border-left-color: #F97316; }
-            .tree-node.level-4 { border-left-color: #EF4444; }
-            
-            .node-connector {
-                color: var(--vscode-descriptionForeground);
-                margin-right: 8px;
-                white-space: pre;
-            }
-            
-            .method-name {
-                font-weight: bold;
-                color: var(--vscode-symbolIcon-functionForeground);
-                flex: 1;
-                margin-right: 10px;
-            }
-            
-            .method-complexity {
-                display: flex;
-                gap: 8px;
-                align-items: center;
-                font-size: 0.85em;
-                flex-shrink: 0;
-            }
-            
-            .complexity-badge {
-                font-weight: bold;
-                padding: 2px 6px;
-                border-radius: 3px;
-                font-size: 0.8em;
-            }
-            
-            .complexity-badge.excellent { background-color: #22C55E; color: white; }
-            .complexity-badge.good { background-color: #EAB308; color: white; }
-            .complexity-badge.fair { background-color: #F97316; color: white; }
-            .complexity-badge.poor { background-color: #EF4444; color: white; }
-            .complexity-badge.bad { background-color: #DC2626; color: white; }
-            .complexity-badge.terrible { background-color: #7F1D1D; color: white; }
-            .complexity-badge.unknown { background-color: #6B7280; color: white; }
+            ${COMPLEXITY_BADGE_STYLES}
             
             .no-analysis {
                 text-align: center;
@@ -411,16 +372,18 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 vscode.postMessage({ type: 'analyzeCode' });
             }
 
+            ${COMMON_WEBVIEW_SCRIPTS}
+
             window.addEventListener('message', event => {
                 const message = event.data;
                 switch (message.type) {
                     case 'updateAnalysis':
-                        updateAnalysis(message.methods, message.fileName, message.hierarchy);
+                        updateAnalysis(message.methods, message.fileName, message.fileUri, message.hierarchy);
                         break;
                 }
             });
 
-            function updateAnalysis(methods, fileName, hierarchy) {
+            function updateAnalysis(methods, fileName, fileUri, hierarchy) {
                 const resultsDiv = document.getElementById('results');
                 const fileHeaderDiv = document.getElementById('fileHeader');
                 
@@ -442,7 +405,7 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 const hierarchyTree = buildHierarchyTree(methods, hierarchyMap);
                 
                 resultsDiv.innerHTML = '<div class="hierarchy-tree">' + 
-                    renderHierarchyTree(hierarchyTree) + 
+                    renderHierarchyTree(hierarchyTree, fileUri) + 
                     '</div>';
             }
 
@@ -516,19 +479,21 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 };
             }
 
-            function renderHierarchyTree(nodes) {
-                return nodes.map(node => renderTreeNode(node)).join('');
+            function renderHierarchyTree(nodes, fileUri) {
+                return nodes.map(node => renderTreeNode(node, fileUri)).join('');
             }
 
-            function renderTreeNode(node) {
+            function renderTreeNode(node, fileUri) {
                 const indent = '　'.repeat(node.level * 2); // Use full-width space for indentation
                 const connector = node.level > 0 ? '└─ ' : '';
                 const method = node.method;
                 
                 let result = \`
                     <div class="tree-node level-\${node.level}">
-                        <span class="node-connector">\${indent}\${connector}</span>
-                        <span class="method-name">\${escapeHtml(method.name)}</span>
+                        <div class="method-header">
+                            <span class="node-connector">\${indent}\${connector}</span>
+                            <span class="method-name" onclick="navigateToFunction('\${escapeHtml(fileUri || '')}\', '\${escapeHtml(method.name)}')">\${escapeHtml(method.name)}</span>
+                        </div>
                         <div class="method-complexity">
                             <span class="complexity-badge \${getComplexityClass(method.complexity.notation)}">
                                 \${getComplexityIndicator(method.complexity.notation)}
@@ -543,47 +508,12 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                 \`;
                 
                 if (node.children && node.children.length > 0) {
-                    result += node.children.map(child => renderTreeNode(child)).join('');
+                    result += node.children.map(child => renderTreeNode(child, fileUri)).join('');
                 }
                 
                 return result;
             }
 
-            function getComplexityIndicator(complexity) {
-                const indicatorMap = {
-                    "O(1)": "EXCELLENT",
-                    "O(log n)": "GOOD", 
-                    "O(n)": "GOOD",
-                    "O(n log n)": "FAIR",
-                    "O(n²)": "POOR",
-                    "O(n³)": "POOR",
-                    "O(2^n)": "BAD",
-                    "O(k^n)": "TERRIBLE",
-                    "O(n!)": "TERRIBLE"
-                };
-                return indicatorMap[complexity] || "UNKNOWN";
-            }
-
-            function getComplexityClass(complexity) {
-                const classMap = {
-                    "O(1)": "excellent",
-                    "O(log n)": "good",
-                    "O(n)": "good",
-                    "O(n log n)": "fair",
-                    "O(n²)": "poor",
-                    "O(n³)": "poor",
-                    "O(2^n)": "bad",
-                    "O(k^n)": "terrible",
-                    "O(n!)": "terrible"
-                };
-                return classMap[complexity] || "unknown";
-            }
-
-            function escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
         </script>
     </body>
     </html>`;

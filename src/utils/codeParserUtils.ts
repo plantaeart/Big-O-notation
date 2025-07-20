@@ -106,12 +106,56 @@ export function extractFunctionCalls(
   const functionCalls: string[] = [];
 
   for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip lines that are comments or strings (basic check)
+    if (
+      trimmed.startsWith("#") ||
+      trimmed.startsWith('"""') ||
+      trimmed.startsWith("'''")
+    ) {
+      continue;
+    }
+
+    // Skip string literals that might contain function-like patterns
+    if (isWithinString(line)) {
+      continue;
+    }
+
     // Look for function calls: functionName(
     const matches = line.match(/([a-zA-Z_]\w*)\s*\(/g);
     if (matches) {
       for (const match of matches) {
         const functionName = match.replace(/\s*\(/, "");
-        // Filter out built-in functions, common Python functions, and self-calls
+
+        // Get the position of this match in the line
+        const matchIndex = line.indexOf(match);
+        const beforeMatch = line.substring(0, matchIndex);
+
+        // Filter out false positives:
+        // 1. Method calls on objects (has dot before)
+        if (beforeMatch.trim().endsWith(".")) {
+          continue;
+        }
+
+        // 2. Dictionary/map assignments (like operations = {'1': self.func})
+        if (
+          beforeMatch.includes(":") &&
+          (beforeMatch.includes("{") || beforeMatch.includes("="))
+        ) {
+          continue;
+        }
+
+        // 3. Function references in data structures (not actual calls)
+        if (beforeMatch.includes("[") || beforeMatch.includes(",")) {
+          // Check if it's actually a call or just a reference
+          const afterMatch = line.substring(matchIndex + match.length);
+          if (!afterMatch.trim().startsWith(")") && !afterMatch.includes(")")) {
+            continue;
+          }
+        }
+
+        // 4. Built-in functions, common Python functions, and self-calls
         if (
           !isBuiltinFunction(functionName) &&
           functionName !== currentFunctionName
@@ -123,6 +167,16 @@ export function extractFunctionCalls(
   }
 
   return [...new Set(functionCalls)]; // Remove duplicates
+}
+
+// Helper function to check if a function call is within a string literal
+function isWithinString(line: string): boolean {
+  // Basic check for string literals
+  const singleQuoteCount = (line.match(/'/g) || []).length;
+  const doubleQuoteCount = (line.match(/"/g) || []).length;
+
+  // If odd number of quotes, likely within string (simple heuristic)
+  return singleQuoteCount % 2 === 1 || doubleQuoteCount % 2 === 1;
 }
 
 // Extract nested function definitions and their relationships

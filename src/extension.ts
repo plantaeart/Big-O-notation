@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { analyzeCodeComplexity } from "./analysis/complexityAnalyzer";
-import { BigOWebviewProvider } from "./webview/BigOWebviewProvider";
-import { FileOverviewWebviewProvider } from "./webview/FileOverviewWebviewProvider";
+import { BigOWebviewProvider } from "./webview/BigO-File-Analysis-WebviewProvider";
+import { FileOverviewWebviewProvider } from "./webview/Big-O-Files-Overview-WebviewProvider";
 import {
   registerAnalyzeComplexityCommand,
   registerReapplyDecorationsCommand,
