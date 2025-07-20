@@ -65,10 +65,6 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.onDidReceiveMessage((data) => {
       switch (data.type) {
-        case "sortFiles": {
-          this._refreshView(data.sortBy);
-          break;
-        }
         case "scanAllFiles": {
           this._scanAllPythonFiles();
           break;
@@ -274,11 +270,10 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     const files = Array.from(this._fileAnalyses.values());
-    const sortedFiles = sortFilesByComplexity(files, sortBy);
     const stats = this._calculateStats();
 
     // Convert hierarchy maps to arrays for serialization
-    const filesWithHierarchy = sortedFiles.map((file) => ({
+    const filesWithHierarchy = files.map((file) => ({
       ...file,
       hierarchy: file.hierarchy ? Array.from(file.hierarchy.entries()) : [],
     }));
@@ -333,6 +328,21 @@ ${WEBVIEW_STYLES}
             .poor .stat-number { color: #EF4444; }
             .bad .stat-number { color: #DC2626; }
             .terrible .stat-number { color: #7F1D1D; }
+            
+            .stat-box.clickable {
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            
+            .stat-box.clickable:hover {
+                opacity: 0.8;
+                transform: translateY(-1px);
+            }
+            
+            .stat-box.selected {
+                border: 2px solid var(--vscode-focusBorder);
+                box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+            }
             
             .controls {
                 margin-bottom: 20px;
@@ -512,6 +522,8 @@ ${WEBVIEW_STYLES}
         <script>
             const vscode = acquireVsCodeApi();
             let currentSortBy = 'alphabetic';
+            let allFiles = []; // Store all files for filtering
+            let selectedFilters = new Set(); // Store selected complexity filters
 
             // Signal that the webview is ready
             window.addEventListener('load', () => {
@@ -573,10 +585,11 @@ ${WEBVIEW_STYLES}
             }
 
             function updateOverview(files, stats, sortBy) {
+                allFiles = files; // Store all files for filtering
                 currentSortBy = sortBy;
                 updateStats(stats);
                 updateControls();
-                updateFiles(files);
+                applyFiltersAndSort();
             }
 
             function updateStats(stats) {
@@ -593,27 +606,27 @@ ${WEBVIEW_STYLES}
                             <div class="stat-number">\${stats.totalMethods}</div>
                             <div class="stat-label">Total Methods</div>
                         </div>
-                        <div class="stat-box excellent">
+                        <div class="stat-box excellent clickable \${selectedFilters.has('excellent') ? 'selected' : ''}" onclick="toggleFilter('excellent')">
                             <div class="stat-number">\${stats.excellentMethods}</div>
                             <div class="stat-label">Excellent</div>
                         </div>
-                        <div class="stat-box good">
+                        <div class="stat-box good clickable \${selectedFilters.has('good') ? 'selected' : ''}" onclick="toggleFilter('good')">
                             <div class="stat-number">\${stats.goodMethods}</div>
                             <div class="stat-label">Good</div>
                         </div>
-                        <div class="stat-box fair">
+                        <div class="stat-box fair clickable \${selectedFilters.has('fair') ? 'selected' : ''}" onclick="toggleFilter('fair')">
                             <div class="stat-number">\${stats.fairMethods}</div>
                             <div class="stat-label">Fair</div>
                         </div>
-                        <div class="stat-box poor">
+                        <div class="stat-box poor clickable \${selectedFilters.has('poor') ? 'selected' : ''}" onclick="toggleFilter('poor')">
                             <div class="stat-number">\${stats.poorMethods}</div>
                             <div class="stat-label">Poor</div>
                         </div>
-                        <div class="stat-box bad">
+                        <div class="stat-box bad clickable \${selectedFilters.has('bad') ? 'selected' : ''}" onclick="toggleFilter('bad')">
                             <div class="stat-number">\${stats.badMethods}</div>
                             <div class="stat-label">Bad</div>
                         </div>
-                        <div class="stat-box terrible">
+                        <div class="stat-box terrible clickable \${selectedFilters.has('terrible') ? 'selected' : ''}" onclick="toggleFilter('terrible')">
                             <div class="stat-number">\${stats.terribleMethods}</div>
                             <div class="stat-label">Terrible</div>
                         </div>
@@ -662,6 +675,7 @@ ${WEBVIEW_STYLES}
                                 ...method,
                                 fileUri: file.fileUri
                             }));
+                            // Build hierarchy tree with only the filtered methods
                             const hierarchyTree = buildHierarchyTree(methodsWithFileUri, hierarchyMap);
                             
                             return \`
@@ -672,6 +686,7 @@ ${WEBVIEW_STYLES}
                                             <div class="file-stats">
                                                 <div class="file-stat">
                                                     <span>📊 \${file.methods.length} methods</span>
+                                                    \${selectedFilters.size > 0 ? '<span style="color: var(--vscode-descriptionForeground); font-size: 0.8em;"> (filtered)</span>' : ''}
                                                 </div>
                                                 <div class="file-stat">
                                                     <span>⏱️ Worst Time:</span>
@@ -706,7 +721,186 @@ ${WEBVIEW_STYLES}
             }
 
             function sortFiles(sortBy) {
-                vscode.postMessage({ type: 'sortFiles', sortBy: sortBy });
+                currentSortBy = sortBy;
+                applyFiltersAndSort();
+            }
+
+            function toggleFilter(complexityLevel) {
+                if (selectedFilters.has(complexityLevel)) {
+                    selectedFilters.delete(complexityLevel);
+                } else {
+                    selectedFilters.add(complexityLevel);
+                }
+
+                // Update the visual state of the stat boxes
+                updateStats(getStatsFromAllFiles());
+                
+                // Apply filters and sorting
+                applyFiltersAndSort();
+            }
+
+            function applyFiltersAndSort() {
+                let filteredFiles = allFiles;
+
+                // Apply complexity filters if any are selected
+                if (selectedFilters.size > 0) {
+                    filteredFiles = allFiles.filter(file => {
+                        // Check if file has methods matching any selected complexity level
+                        return file.methods.some(method => {
+                            const indicator = getComplexityIndicator(method.complexity.notation).toLowerCase();
+                            return selectedFilters.has(indicator);
+                        });
+                    }).map(file => {
+                        // Filter methods to only show those matching selected complexity levels
+                        const filteredMethods = file.methods.filter(method => {
+                            const indicator = getComplexityIndicator(method.complexity.notation).toLowerCase();
+                            return selectedFilters.has(indicator);
+                        });
+
+                        // Return a new file object with filtered methods
+                        return {
+                            ...file,
+                            methods: filteredMethods,
+                            // Recalculate worst complexities based on filtered methods
+                            worstTimeComplexity: findWorstComplexityFromMethods(filteredMethods, "time"),
+                            worstSpaceComplexity: findWorstComplexityFromMethods(filteredMethods, "space")
+                        };
+                    });
+
+                    // When filtering is active, default to "worstToBest" sorting if currently on alphabetic
+                    if (currentSortBy === 'alphabetic') {
+                        currentSortBy = 'worstToBest';
+                    }
+                } else if (selectedFilters.size === 0 && currentSortBy !== 'alphabetic') {
+                    // When no filters are active, default back to alphabetic
+                    currentSortBy = 'alphabetic';
+                }
+
+                // Sort the filtered files
+                const sortedFiles = sortFilesByComplexity(filteredFiles, currentSortBy);
+                
+                // Update controls to reflect current sort
+                updateControls();
+                
+                // Update the file display
+                updateFiles(sortedFiles);
+            }
+
+            function findWorstComplexityFromMethods(methods, type) {
+                const complexityPriority = {
+                    "O(1)": 1,
+                    "O(log n)": 2,
+                    "O(n)": 3,
+                    "O(n log n)": 4,
+                    "O(n²)": 5,
+                    "O(n³)": 6,
+                    "O(2^n)": 7,
+                    "O(k^n)": 8,
+                    "O(n!)": 9,
+                };
+
+                let worstComplexity = "O(1)";
+                let worstPriority = 0;
+
+                for (const method of methods) {
+                    const complexity = type === "time" 
+                        ? method.complexity.notation 
+                        : method.spaceComplexity.notation;
+
+                    const priority = complexityPriority[complexity] || 0;
+                    if (priority > worstPriority) {
+                        worstPriority = priority;
+                        worstComplexity = complexity;
+                    }
+                }
+
+                return worstComplexity;
+            }
+
+            function getStatsFromAllFiles() {
+                const stats = {
+                    totalMethods: 0,
+                    excellentMethods: 0,
+                    goodMethods: 0,
+                    fairMethods: 0,
+                    poorMethods: 0,
+                    badMethods: 0,
+                    terribleMethods: 0,
+                };
+
+                for (const file of allFiles) {
+                    stats.totalMethods += file.methods.length;
+
+                    for (const method of file.methods) {
+                        const indicator = getComplexityIndicator(method.complexity.notation);
+                        switch (indicator) {
+                            case "EXCELLENT":
+                                stats.excellentMethods++;
+                                break;
+                            case "GOOD":
+                                stats.goodMethods++;
+                                break;
+                            case "FAIR":
+                                stats.fairMethods++;
+                                break;
+                            case "POOR":
+                                stats.poorMethods++;
+                                break;
+                            case "BAD":
+                                stats.badMethods++;
+                                break;
+                            case "TERRIBLE":
+                                stats.terribleMethods++;
+                                break;
+                        }
+                    }
+                }
+
+                return stats;
+            }
+
+            function sortFilesByComplexity(files, sortBy) {
+                const complexityPriority = {
+                    "O(1)": 1,
+                    "O(log n)": 2,
+                    "O(n)": 3,
+                    "O(n log n)": 4,
+                    "O(n²)": 5,
+                    "O(n³)": 6,
+                    "O(2^n)": 7,
+                    "O(k^n)": 8,
+                    "O(n!)": 9,
+                };
+
+                switch (sortBy) {
+                    case "alphabetic":
+                        return [...files].sort((a, b) => a.fileName.localeCompare(b.fileName));
+
+                    case "timeComplexity":
+                    case "worstToBest":
+                        return [...files].sort((a, b) => {
+                            const priorityA = complexityPriority[a.worstTimeComplexity] || 0;
+                            const priorityB = complexityPriority[b.worstTimeComplexity] || 0;
+                            return priorityB - priorityA; // Higher complexity first
+                        });
+
+                    case "bestToWorst":
+                        return [...files].sort((a, b) => {
+                            const priorityA = complexityPriority[a.worstTimeComplexity] || 0;
+                            const priorityB = complexityPriority[b.worstTimeComplexity] || 0;
+                            return priorityA - priorityB; // Lower complexity first
+                        });
+
+                    case "spaceComplexity":
+                        return [...files].sort((a, b) => {
+                            const priorityA = complexityPriority[a.worstSpaceComplexity] || 0;
+                            const priorityB = complexityPriority[b.worstSpaceComplexity] || 0;
+                            return priorityB - priorityA; // Higher complexity first
+                        });
+
+                    default:
+                        return files;
+                }
             }
 
             function navigateToFile(fileUri) {

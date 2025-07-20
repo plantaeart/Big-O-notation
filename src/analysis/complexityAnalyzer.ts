@@ -248,7 +248,6 @@ function analyzeMethodComplexity(
 
   // Check for O(n²) patterns - look for nested loops and quadratic operations
   const hasQuadraticPatterns =
-    loopLines.length === 2 || // Two loops suggests nesting
     bodyLines.some(
       (line) =>
         // Classic bubble sort pattern
@@ -264,33 +263,83 @@ function analyzeMethodComplexity(
           line.replace(/\s+/g, " ")
         )
     ) ||
-    // Check for nested structure by looking at indentation
+    // Check for actual nested structure by analyzing indentation levels
     (() => {
-      let nestedLoops = 0;
-      let currentIndent = 0;
+      const loopIndentLevels: number[] = [];
+
       for (const line of bodyLines) {
         const indent = line.length - line.trimStart().length;
-        if (/for\s+\w+\s+in\s+|while\s+/.test(line)) {
-          if (indent > currentIndent) {
-            nestedLoops++;
-          } else {
-            nestedLoops = 1;
-          }
-          currentIndent = indent;
+        const trimmedLine = line.trim();
+
+        // Check if this line contains a loop
+        if (/^(for\s+\w+\s+in\s+|while\s+)/.test(trimmedLine)) {
+          loopIndentLevels.push(indent);
         }
       }
-      return nestedLoops >= 2;
+
+      // Check if we have loops at different indentation levels (indicating nesting)
+      if (loopIndentLevels.length < 2) {
+        return false;
+      }
+
+      // Sort indentation levels to check for proper nesting
+      const sortedIndents = [...loopIndentLevels].sort((a, b) => a - b);
+
+      // If we have loops at different indentation levels, check if they're truly nested
+      // by ensuring there's a significant indentation difference (at least 2 spaces)
+      for (let i = 1; i < sortedIndents.length; i++) {
+        if (sortedIndents[i] - sortedIndents[i - 1] >= 2) {
+          return true; // Found truly nested loops
+        }
+      }
+
+      return false;
     })();
 
-  // Check for O(n³) patterns - 3 or more loops, often matrix multiplication
+  // Check for O(n³) patterns - actual triple nested loops or matrix multiplication
   const hasCubicPatterns =
-    loopLines.length >= 3 ||
     bodyLines.some((line) =>
       // Matrix multiplication pattern
       /for.*range\(.*\).*for.*range\(.*\).*for.*range\(.*\)/.test(
         line.replace(/\s+/g, " ")
       )
-    );
+    ) ||
+    // Check for triple nested structure by analyzing indentation levels
+    (() => {
+      const loopIndentLevels: number[] = [];
+
+      for (const line of bodyLines) {
+        const indent = line.length - line.trimStart().length;
+        const trimmedLine = line.trim();
+
+        // Check if this line contains a loop
+        if (/^(for\s+\w+\s+in\s+|while\s+)/.test(trimmedLine)) {
+          loopIndentLevels.push(indent);
+        }
+      }
+
+      // Need at least 3 loops for cubic complexity
+      if (loopIndentLevels.length < 3) {
+        return false;
+      }
+
+      // Sort indentation levels to check for proper triple nesting
+      const sortedIndents = [...loopIndentLevels].sort((a, b) => a - b);
+
+      // Check if we have at least 3 distinct indentation levels (indicating triple nesting)
+      const uniqueIndents = [...new Set(sortedIndents)];
+      if (uniqueIndents.length >= 3) {
+        // Verify the indentation differences are significant (at least 2 spaces apart)
+        for (let i = 2; i < uniqueIndents.length; i++) {
+          if (uniqueIndents[i] - uniqueIndents[0] >= 4) {
+            // At least 2 levels of nesting
+            return true;
+          }
+        }
+      }
+
+      return false;
+    })();
 
   // Check for O(k^n) patterns (exponential with k base, worse than 2^n)
   const hasExponentialKPatterns = (() => {
@@ -308,7 +357,33 @@ function analyzeMethodComplexity(
       });
     });
 
-    const hasNestedLoops = loopLines.length >= 2;
+    // Check for actual nested loops (not just multiple sequential loops)
+    const hasNestedLoops = (() => {
+      const loopIndentLevels: number[] = [];
+
+      for (const line of bodyLines) {
+        const indent = line.length - line.trimStart().length;
+        const trimmedLine = line.trim();
+
+        if (/^(for\s+\w+\s+in\s+|while\s+)/.test(trimmedLine)) {
+          loopIndentLevels.push(indent);
+        }
+      }
+
+      if (loopIndentLevels.length < 2) {
+        return false;
+      }
+
+      // Check if we have loops at different indentation levels
+      const sortedIndents = [...loopIndentLevels].sort((a, b) => a - b);
+      for (let i = 1; i < sortedIndents.length; i++) {
+        if (sortedIndents[i] - sortedIndents[i - 1] >= 2) {
+          return true;
+        }
+      }
+
+      return false;
+    })();
 
     // Pattern: for item in recursive_function(): for other in collection:
     const hasLoopOverRecursiveResult = bodyLines.some((line) => {
