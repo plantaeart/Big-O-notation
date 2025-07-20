@@ -36,7 +36,7 @@ export function analyzeCodeComplexity(code: string): ComplexityAnalysisResult {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Start of a new function
+    // Check if this line starts a new function
     if (isFunctionDefinition(line)) {
       // Process previous method if exists
       if (currentMethod && methodLines.length > 0) {
@@ -72,8 +72,38 @@ export function analyzeCodeComplexity(code: string): ComplexityAnalysisResult {
       };
       methodLines = [line];
     } else if (currentMethod) {
-      // Add line to current method
-      methodLines.push(line);
+      // Check if we've reached the end of the current function
+      // A function ends when we encounter:
+      // 1. Another function definition (handled above)
+      // 2. Code at the same or lower indentation level as the function definition that's not part of the function
+      const currentFunctionIndent =
+        lines[currentMethod.lineStart].length -
+        lines[currentMethod.lineStart].trimStart().length;
+      const lineIndent = line.length - line.trimStart().length;
+
+      // If we hit a line that's at the same indentation as the function definition or less,
+      // and it's not empty or a comment, then we've likely left the function
+      if (
+        trimmed !== "" &&
+        !trimmed.startsWith("#") &&
+        lineIndent <= currentFunctionIndent
+      ) {
+        // This line is not part of the current function
+        // Finish the current method
+        currentMethod.complexity = analyzeMethodComplexity(
+          methodLines,
+          currentMethod.name,
+          lines // Pass full code context for import detection
+        );
+        updateMethodWithSpaceAnalysis(currentMethod, methodLines);
+        currentMethod.lineEnd = i - 1;
+        methods.push(currentMethod);
+        currentMethod = null;
+        methodLines = [];
+      } else {
+        // Add line to current method
+        methodLines.push(line);
+      }
     }
   }
 
@@ -266,7 +296,16 @@ function analyzeMethodComplexity(
   const hasExponentialKPatterns = (() => {
     const hasRecursiveCall = bodyLines.some((line) => {
       const functionCallPattern = new RegExp(`\\b${functionName}\\s*\\(`, "g");
-      return functionCallPattern.test(line);
+      const matches = line.match(functionCallPattern);
+      if (!matches) {
+        return false;
+      }
+
+      // Check if it's not a method call on an object
+      return matches.some((match) => {
+        const beforeMatch = line.substring(0, line.indexOf(match));
+        return !beforeMatch.trim().endsWith(".");
+      });
     });
 
     const hasNestedLoops = loopLines.length >= 2;
@@ -277,7 +316,16 @@ function analyzeMethodComplexity(
         `for.*in\\s+${functionName}\\s*\\(`,
         "g"
       );
-      return functionCallPattern.test(line);
+      const matches = line.match(functionCallPattern);
+      if (!matches) {
+        return false;
+      }
+
+      // Check if it's not a method call on an object
+      return matches.some((match) => {
+        const beforeMatch = line.substring(0, line.indexOf(match));
+        return !beforeMatch.trim().endsWith(".");
+      });
     });
 
     // Specific password/combination generation pattern
@@ -305,29 +353,62 @@ function analyzeMethodComplexity(
         /range\(2\*\*/.test(line) ||
         /2\s*\*\*\s*n/.test(line) ||
         // Power set generation pattern: range(2**n) or range(2**len(...))
-        /range\s*\(\s*2\s*\*\*\s*(n|len\()/i.test(line) ||
+        /\brange\s*\(\s*2\s*\*\*\s*(n|len\()/i.test(line) ||
         // Bit manipulation patterns often indicate exponential
-        /1\s*<<\s*|<<\s*\w+/.test(line)
+        /\b1\s*<<\s*\w+|\w+\s*<<\s*\w+/.test(line)
     ) ||
     // Check for recursive patterns with multiple calls (like fibonacci, hanoi)
     (() => {
       // Count recursive calls to the same function
       const recursiveCallLines = bodyLines.filter((line) => {
-        const functionCallPattern = new RegExp(
-          `\\b${functionName}\\s*\\(`,
-          "g"
-        );
-        return functionCallPattern.test(line);
+        // More specific pattern: look for calls that are actually to this function
+        // Not just any occurrence of the function name
+        const patterns = [
+          // Direct recursive call: functionName(...)
+          new RegExp(`\\b${functionName}\\s*\\(`, "g"),
+          // Return recursive call: return functionName(...)
+          new RegExp(`return\\s+${functionName}\\s*\\(`, "g"),
+          // Assignment with recursive call: var = functionName(...)
+          new RegExp(`=\\s*${functionName}\\s*\\(`, "g"),
+        ];
+
+        // Check if this line contains a recursive call pattern
+        return patterns.some((pattern) => {
+          const matches = line.match(pattern);
+          if (!matches) {
+            return false;
+          }
+
+          // Additional check: make sure it's not a method call on an object
+          // like self.close() or obj.functionName()
+          const beforeMatch = line.substring(0, line.indexOf(matches[0]));
+          // If there's a dot right before the function name, it's likely a method call on an object
+          return !beforeMatch.trim().endsWith(".");
+        });
       });
 
       // If we have multiple recursive calls or multiple calls in extend/append operations
       const totalRecursiveCalls = recursiveCallLines.reduce((count, line) => {
-        const functionCallPattern = new RegExp(
-          `\\b${functionName}\\s*\\(`,
-          "g"
-        );
-        const matches = line.match(functionCallPattern);
-        return count + (matches ? matches.length : 0);
+        const patterns = [
+          new RegExp(`\\b${functionName}\\s*\\(`, "g"),
+          new RegExp(`return\\s+${functionName}\\s*\\(`, "g"),
+          new RegExp(`=\\s*${functionName}\\s*\\(`, "g"),
+        ];
+
+        let lineCount = 0;
+        patterns.forEach((pattern) => {
+          const matches = line.match(pattern);
+          if (matches) {
+            // Filter out method calls on objects
+            matches.forEach((match) => {
+              const beforeMatch = line.substring(0, line.indexOf(match));
+              if (!beforeMatch.trim().endsWith(".")) {
+                lineCount++;
+              }
+            });
+          }
+        });
+        return count + lineCount;
       }, 0);
 
       // Check for patterns like hanoi: moves.extend(hanoi(...)) appears twice
