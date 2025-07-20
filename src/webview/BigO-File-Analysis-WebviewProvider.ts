@@ -4,6 +4,8 @@ import {
   navigateToFunction,
   getComplexityIndicator,
   getComplexityClass,
+  improveFunctionRating,
+  extractFunctionCode,
   COMPLEXITY_BADGE_STYLES,
   TREE_NODE_STYLES,
   COMMON_WEBVIEW_SCRIPTS,
@@ -57,6 +59,10 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
         }
         case "navigateToFunction": {
           navigateToFunction(data.fileUri, data.functionName);
+          break;
+        }
+        case "improveFunctionRating": {
+          this._handleImproveFunctionRating(data);
           break;
         }
         case "webviewReady": {
@@ -146,6 +152,51 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
         fileUri: activeEditor.document.uri.toString(),
         hierarchy: hierarchy ? Array.from(hierarchy.entries()) : [],
       });
+    }
+  }
+
+  private async _handleImproveFunctionRating(data: any) {
+    try {
+      // Extract function code from the file
+      const functionCode = await extractFunctionCode(
+        data.fileUri,
+        data.functionName
+      );
+
+      // Find the method in our analysis to get current complexity and dependencies
+      let currentComplexity = data.currentComplexity;
+      let childDependencies: string[] = [];
+
+      // Search through file analyses to find the method and its dependencies
+      for (const fileAnalysis of this._fileAnalyses.values()) {
+        const method = fileAnalysis.methods.find(
+          (m) => m.name === data.functionName
+        );
+        if (method) {
+          currentComplexity = method.complexity;
+
+          // Get child dependencies from hierarchy
+          if (fileAnalysis.hierarchy) {
+            const dependencies = fileAnalysis.hierarchy.get(data.functionName);
+            childDependencies = dependencies || [];
+          }
+          break;
+        }
+      }
+
+      // Call the improve function rating utility
+      await improveFunctionRating(
+        data.fileUri,
+        data.functionName,
+        functionCode,
+        currentComplexity,
+        childDependencies
+      );
+    } catch (error) {
+      console.error("Error handling improve function rating:", error);
+      vscode.window.showErrorMessage(
+        `Failed to improve function rating: ${error}`
+      );
     }
   }
 
@@ -409,76 +460,6 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                     '</div>';
             }
 
-            function buildHierarchyTree(methods, hierarchyMap) {
-                const methodMap = new Map(methods.map(m => [m.name, m]));
-                const childrenMap = new Map();
-                const parentCount = new Map(); // Track how many parents each function has
-
-                // Build children map and count parents for each function
-                for (const [parent, children] of hierarchyMap) {
-                    const validChildren = children.filter(child => methodMap.has(child));
-                    if (validChildren.length > 0) {
-                        childrenMap.set(parent, validChildren);
-                        
-                        // Count parents for each child
-                        validChildren.forEach(child => {
-                            parentCount.set(child, (parentCount.get(child) || 0) + 1);
-                        });
-                    }
-                }
-
-                // For functions with multiple parents, choose the most appropriate parent
-                const finalChildrenMap = new Map();
-                const assignedChildren = new Set();
-
-                for (const [parent, children] of childrenMap) {
-                    const uniqueChildren = children.filter(child => {
-                        if (assignedChildren.has(child)) return false;
-                        
-                        // If function has only one parent, assign it
-                        if (parentCount.get(child) === 1) {
-                            assignedChildren.add(child);
-                            return true;
-                        }
-                        
-                        // For multiple parents, assign to the first encountered
-                        const isFirstEncounter = !assignedChildren.has(child);
-                        if (isFirstEncounter) {
-                            assignedChildren.add(child);
-                            return true;
-                        }
-                        
-                        return false;
-                    });
-
-                    if (uniqueChildren.length > 0) {
-                        finalChildrenMap.set(parent, uniqueChildren);
-                    }
-                }
-
-                // Find root nodes (functions that are not children of other functions)
-                const rootNodes = methods
-                    .filter(method => !assignedChildren.has(method.name))
-                    .map(method => createTreeNode(method, finalChildrenMap, methodMap, 0));
-
-                return rootNodes;
-            }
-
-            function createTreeNode(method, childrenMap, methodMap, level) {
-                const children = (childrenMap.get(method.name) || [])
-                    .map(childName => {
-                        const childMethod = methodMap.get(childName);
-                        return childMethod ? createTreeNode(childMethod, childrenMap, methodMap, level + 1) : null;
-                    })
-                    .filter(node => node !== null);
-
-                return {
-                    method: method,
-                    children: children,
-                    level: level
-                };
-            }
-
             function renderHierarchyTree(nodes, fileUri) {
                 return nodes.map(node => renderTreeNode(node, fileUri)).join('');
             }
@@ -493,6 +474,9 @@ export class BigOWebviewProvider implements vscode.WebviewViewProvider {
                         <div class="method-header">
                             <span class="node-connector">\${indent}\${connector}</span>
                             <span class="method-name" onclick="navigateToFunction('\${escapeHtml(fileUri || '')}\', '\${escapeHtml(method.name)}')">\${escapeHtml(method.name)}</span>
+                            <button class="improve-button" onclick="improveFunctionRating('\${escapeHtml(fileUri || '')}\', '\${escapeHtml(method.name)}\', '', { notation: '\${escapeHtml(method.complexity.notation)}', description: '\${escapeHtml(method.complexity.description)}', confidence: \${method.complexity.confidence} }, [])">
+                                ✨ improve
+                            </button>
                         </div>
                         <div class="method-complexity">
                             <span class="complexity-badge \${getComplexityClass(method.complexity.notation)}">

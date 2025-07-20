@@ -1,4 +1,5 @@
 export const PythonKeywords = {
+  ASYNC: "async",
   FOR: "for",
   WHILE: "while",
   IF: "if",

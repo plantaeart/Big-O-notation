@@ -8,6 +8,8 @@ import {
   getComplexityClass,
   findWorstComplexity,
   sortFilesByComplexity,
+  improveFunctionRating,
+  extractFunctionCode,
   COMPLEXITY_BADGE_STYLES,
   TREE_NODE_STYLES,
   COMMON_WEBVIEW_SCRIPTS,
@@ -71,10 +73,18 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
         }
         case "navigateToFile": {
           navigateToFile(data.fileUri);
+          // Mark this file as should be expanded for the next refresh
+          this._markFileForExpansion(data.fileUri);
           break;
         }
         case "navigateToFunction": {
           navigateToFunction(data.fileUri, data.functionName);
+          // Mark this file as should be expanded for the next refresh
+          this._markFileForExpansion(data.fileUri);
+          break;
+        }
+        case "improveFunctionRating": {
+          this._handleImproveFunctionRating(data);
           break;
         }
         case "webviewReady": {
@@ -264,6 +274,61 @@ export class FileOverviewWebviewProvider implements vscode.WebviewViewProvider {
     return stats;
   }
 
+  private async _handleImproveFunctionRating(data: any) {
+    try {
+      // Extract function code from the file
+      const functionCode = await extractFunctionCode(
+        data.fileUri,
+        data.functionName
+      );
+
+      // Find the method in our analysis to get current complexity and dependencies
+      let currentComplexity = data.currentComplexity;
+      let childDependencies: string[] = [];
+
+      // Search through file analyses to find the method and its dependencies
+      for (const fileAnalysis of this._fileAnalyses.values()) {
+        const method = fileAnalysis.methods.find(
+          (m) => m.name === data.functionName
+        );
+        if (method) {
+          currentComplexity = method.complexity;
+
+          // Get child dependencies from hierarchy
+          if (fileAnalysis.hierarchy) {
+            const dependencies = fileAnalysis.hierarchy.get(data.functionName);
+            childDependencies = dependencies || [];
+          }
+          break;
+        }
+      }
+
+      // Call the improve function rating utility
+      await improveFunctionRating(
+        data.fileUri,
+        data.functionName,
+        functionCode,
+        currentComplexity,
+        childDependencies
+      );
+    } catch (error) {
+      console.error("Error handling improve function rating:", error);
+      vscode.window.showErrorMessage(
+        `Failed to improve function rating: ${error}`
+      );
+    }
+  }
+
+  private _markFileForExpansion(fileUri: string) {
+    // Send message to webview to mark this file for expansion
+    if (this._view) {
+      this._view.webview.postMessage({
+        type: "markFileForExpansion",
+        fileUri: fileUri,
+      });
+    }
+  }
+
   private _refreshView(sortBy: string = "alphabetic") {
     if (!this._view) {
       return;
@@ -445,6 +510,18 @@ ${WEBVIEW_STYLES}
                 border-left: 3px solid var(--vscode-panel-border);
             }
             
+            .tree-node-highlight {
+                background-color: var(--vscode-list-activeSelectionBackground);
+                border-radius: 4px;
+                margin: 2px 0;
+            }
+            
+            .filter-match-indicator {
+                margin-left: 8px;
+                font-size: 0.9em;
+                opacity: 0.8;
+            }
+            
             .scan-button {
                 background-color: var(--vscode-button-background);
                 color: var(--vscode-button-foreground);
@@ -524,6 +601,7 @@ ${WEBVIEW_STYLES}
             let currentSortBy = 'alphabetic';
             let allFiles = []; // Store all files for filtering
             let selectedFilters = new Set(); // Store selected complexity filters
+            let expandedFiles = new Set(); // Store which files are expanded
 
             // Signal that the webview is ready
             window.addEventListener('load', () => {
@@ -544,6 +622,9 @@ ${WEBVIEW_STYLES}
                         break;
                     case 'scanningCompleted':
                         hideScanningState();
+                        break;
+                    case 'markFileForExpansion':
+                        markFileForExpansion(message.fileUri);
                         break;
                 }
             });
@@ -578,9 +659,11 @@ ${WEBVIEW_STYLES}
                 if (methodsContainer.classList.contains('expanded')) {
                     methodsContainer.classList.remove('expanded');
                     expandIcon.classList.remove('expanded');
+                    expandedFiles.delete(filePath); // Remove from expanded set
                 } else {
                     methodsContainer.classList.add('expanded');
                     expandIcon.classList.add('expanded');
+                    expandedFiles.add(filePath); // Add to expanded set
                 }
             }
 
@@ -677,6 +760,9 @@ ${WEBVIEW_STYLES}
                             }));
                             // Build hierarchy tree with only the filtered methods
                             const hierarchyTree = buildHierarchyTree(methodsWithFileUri, hierarchyMap);
+                            console.log('File:', file.fileName, 'Methods:', methodsWithFileUri.length, 'HierarchyTree:', hierarchyTree);
+                            console.log('File methods details:', methodsWithFileUri.map(m => m.name));
+                            console.log('HierarchyMap entries:', Array.from(hierarchyMap.entries()));
                             
                             return \`
                                 <div class="file-item">
@@ -718,6 +804,47 @@ ${WEBVIEW_STYLES}
                         }).join('')}
                     </div>
                 \`;
+                
+                // Restore accordion states after updating HTML
+                restoreAccordionStates(files);
+            }
+
+            function restoreAccordionStates(files) {
+                // Wait for DOM to be updated, then restore states
+                setTimeout(() => {
+                    files.forEach(file => {
+                        const fileId = btoa(encodeURIComponent(file.filePath)).replace(/[^a-zA-Z0-9]/g, '');
+                        
+                        // Check if this file was previously expanded
+                        if (expandedFiles.has(fileId)) {
+                            const methodsContainer = document.getElementById(\`methods-\${fileId}\`);
+                            const expandIcon = document.getElementById(\`icon-\${fileId}\`);
+                            
+                            if (methodsContainer && expandIcon) {
+                                methodsContainer.classList.add('expanded');
+                                expandIcon.classList.add('expanded');
+                            }
+                        }
+                    });
+                }, 0);
+            }
+
+            function markFileForExpansion(fileUri) {
+                // Find the file in allFiles array and mark it for expansion
+                const file = allFiles.find(f => f.fileUri === fileUri);
+                if (file) {
+                    const fileId = btoa(encodeURIComponent(file.filePath)).replace(/[^a-zA-Z0-9]/g, '');
+                    expandedFiles.add(fileId);
+                    
+                    // If the file is currently visible, expand it immediately
+                    const methodsContainer = document.getElementById(\`methods-\${fileId}\`);
+                    const expandIcon = document.getElementById(\`icon-\${fileId}\`);
+                    
+                    if (methodsContainer && expandIcon) {
+                        methodsContainer.classList.add('expanded');
+                        expandIcon.classList.add('expanded');
+                    }
+                }
             }
 
             function sortFiles(sortBy) {
@@ -740,6 +867,7 @@ ${WEBVIEW_STYLES}
             }
 
             function applyFiltersAndSort() {
+                console.log('applyFiltersAndSort called, selectedFilters:', selectedFilters, 'allFiles:', allFiles);
                 let filteredFiles = allFiles;
 
                 // Apply complexity filters if any are selected
@@ -751,19 +879,47 @@ ${WEBVIEW_STYLES}
                             return selectedFilters.has(indicator);
                         });
                     }).map(file => {
-                        // Filter methods to only show those matching selected complexity levels
-                        const filteredMethods = file.methods.filter(method => {
+                        // Get methods that match the filter
+                        const directMatches = file.methods.filter(method => {
                             const indicator = getComplexityIndicator(method.complexity.notation).toLowerCase();
                             return selectedFilters.has(indicator);
                         });
+
+                        // Include parents and children of matching methods to maintain hierarchy
+                        const hierarchyMap = new Map(file.hierarchy || []);
+                        const methodsToInclude = new Set();
+                        
+                        // Add direct matches
+                        directMatches.forEach(method => {
+                            methodsToInclude.add(method.name);
+                        });
+
+                        // Add parents and children for each direct match
+                        directMatches.forEach(method => {
+                            // Add children
+                            const children = hierarchyMap.get(method.name) || [];
+                            children.forEach(child => methodsToInclude.add(child));
+                            
+                            // Add parents (search through hierarchy to find who calls this method)
+                            for (const [parent, childrenList] of hierarchyMap.entries()) {
+                                if (childrenList.includes(method.name)) {
+                                    methodsToInclude.add(parent);
+                                }
+                            }
+                        });
+
+                        // Filter methods to include matches and their hierarchy
+                        const filteredMethods = file.methods.filter(method => 
+                            methodsToInclude.has(method.name)
+                        );
 
                         // Return a new file object with filtered methods
                         return {
                             ...file,
                             methods: filteredMethods,
-                            // Recalculate worst complexities based on filtered methods
-                            worstTimeComplexity: findWorstComplexityFromMethods(filteredMethods, "time"),
-                            worstSpaceComplexity: findWorstComplexityFromMethods(filteredMethods, "space")
+                            // Recalculate worst complexities based on direct matches only (not parents/children)
+                            worstTimeComplexity: findWorstComplexity(directMatches, "time"),
+                            worstSpaceComplexity: findWorstComplexity(directMatches, "space")
                         };
                     });
 
@@ -784,37 +940,6 @@ ${WEBVIEW_STYLES}
                 
                 // Update the file display
                 updateFiles(sortedFiles);
-            }
-
-            function findWorstComplexityFromMethods(methods, type) {
-                const complexityPriority = {
-                    "O(1)": 1,
-                    "O(log n)": 2,
-                    "O(n)": 3,
-                    "O(n log n)": 4,
-                    "O(n²)": 5,
-                    "O(n³)": 6,
-                    "O(2^n)": 7,
-                    "O(k^n)": 8,
-                    "O(n!)": 9,
-                };
-
-                let worstComplexity = "O(1)";
-                let worstPriority = 0;
-
-                for (const method of methods) {
-                    const complexity = type === "time" 
-                        ? method.complexity.notation 
-                        : method.spaceComplexity.notation;
-
-                    const priority = complexityPriority[complexity] || 0;
-                    if (priority > worstPriority) {
-                        worstPriority = priority;
-                        worstComplexity = complexity;
-                    }
-                }
-
-                return worstComplexity;
             }
 
             function getStatsFromAllFiles() {
@@ -859,127 +984,10 @@ ${WEBVIEW_STYLES}
                 return stats;
             }
 
-            function sortFilesByComplexity(files, sortBy) {
-                const complexityPriority = {
-                    "O(1)": 1,
-                    "O(log n)": 2,
-                    "O(n)": 3,
-                    "O(n log n)": 4,
-                    "O(n²)": 5,
-                    "O(n³)": 6,
-                    "O(2^n)": 7,
-                    "O(k^n)": 8,
-                    "O(n!)": 9,
-                };
-
-                switch (sortBy) {
-                    case "alphabetic":
-                        return [...files].sort((a, b) => a.fileName.localeCompare(b.fileName));
-
-                    case "timeComplexity":
-                    case "worstToBest":
-                        return [...files].sort((a, b) => {
-                            const priorityA = complexityPriority[a.worstTimeComplexity] || 0;
-                            const priorityB = complexityPriority[b.worstTimeComplexity] || 0;
-                            return priorityB - priorityA; // Higher complexity first
-                        });
-
-                    case "bestToWorst":
-                        return [...files].sort((a, b) => {
-                            const priorityA = complexityPriority[a.worstTimeComplexity] || 0;
-                            const priorityB = complexityPriority[b.worstTimeComplexity] || 0;
-                            return priorityA - priorityB; // Lower complexity first
-                        });
-
-                    case "spaceComplexity":
-                        return [...files].sort((a, b) => {
-                            const priorityA = complexityPriority[a.worstSpaceComplexity] || 0;
-                            const priorityB = complexityPriority[b.worstSpaceComplexity] || 0;
-                            return priorityB - priorityA; // Higher complexity first
-                        });
-
-                    default:
-                        return files;
-                }
-            }
-
-            function navigateToFile(fileUri) {
-                vscode.postMessage({ type: 'navigateToFile', fileUri: fileUri });
-            }
-
             ${COMMON_WEBVIEW_SCRIPTS}
 
-            function buildHierarchyTree(methods, hierarchyMap) {
-                const methodMap = new Map(methods.map(m => [m.name, m]));
-                const childrenMap = new Map();
-                const parentCount = new Map(); // Track how many parents each function has
-
-                // Build children map and count parents for each function
-                for (const [parent, children] of hierarchyMap) {
-                    const validChildren = children.filter(child => methodMap.has(child));
-                    if (validChildren.length > 0) {
-                        childrenMap.set(parent, validChildren);
-                        
-                        // Count parents for each child
-                        validChildren.forEach(child => {
-                            parentCount.set(child, (parentCount.get(child) || 0) + 1);
-                        });
-                    }
-                }
-
-                // For functions with multiple parents, choose the most appropriate parent
-                const finalChildrenMap = new Map();
-                const assignedChildren = new Set();
-
-                for (const [parent, children] of childrenMap) {
-                    const uniqueChildren = children.filter(child => {
-                        if (assignedChildren.has(child)) return false;
-                        
-                        // If function has only one parent, assign it
-                        if (parentCount.get(child) === 1) {
-                            assignedChildren.add(child);
-                            return true;
-                        }
-                        
-                        // For multiple parents, assign to the first encountered
-                        const isFirstEncounter = !assignedChildren.has(child);
-                        if (isFirstEncounter) {
-                            assignedChildren.add(child);
-                            return true;
-                        }
-                        
-                        return false;
-                    });
-
-                    if (uniqueChildren.length > 0) {
-                        finalChildrenMap.set(parent, uniqueChildren);
-                    }
-                }
-
-                // Find root nodes (functions that are not children of other functions)
-                const rootNodes = methods
-                    .filter(method => !assignedChildren.has(method.name))
-                    .map(method => createTreeNode(method, finalChildrenMap, methodMap, 0));
-
-                return rootNodes;
-            }
-
-            function createTreeNode(method, childrenMap, methodMap, level) {
-                const children = (childrenMap.get(method.name) || [])
-                    .map(childName => {
-                        const childMethod = methodMap.get(childName);
-                        return childMethod ? createTreeNode(childMethod, childrenMap, methodMap, level + 1) : null;
-                    })
-                    .filter(node => node !== null);
-
-                return {
-                    method: method,
-                    children: children,
-                    level: level
-                };
-            }
-
             function renderHierarchyTree(nodes) {
+                console.log('renderHierarchyTree called with nodes:', nodes);
                 return nodes.map(node => renderTreeNode(node)).join('');
             }
 
@@ -988,11 +996,19 @@ ${WEBVIEW_STYLES}
                 const connector = node.level > 0 ? '└─ ' : '';
                 const method = node.method;
                 
+                // Check if this method matches the current filter
+                const isDirectMatch = selectedFilters.size > 0 && selectedFilters.has(getComplexityIndicator(method.complexity.notation).toLowerCase());
+                const nodeClass = isDirectMatch ? 'tree-node-highlight' : '';
+                
                 let result = \`
-                    <div class="tree-node level-\${node.level}">
+                    <div class="tree-node level-\${node.level} \${nodeClass}">
                         <div class="method-header">
                             <span class="node-connector">\${indent}\${connector}</span>
                             <span class="method-name" onclick="navigateToFunction('\${escapeHtml(method.fileUri || '')}\', '\${escapeHtml(method.name)}')">\${escapeHtml(method.name)}</span>
+                            \${isDirectMatch ? '<span class="filter-match-indicator">🎯</span>' : ''}
+                            <button class="improve-button" onclick="improveFunctionRating('\${escapeHtml(method.fileUri || '')}\', '\${escapeHtml(method.name)}\', '', { notation: '\${escapeHtml(method.complexity.notation)}', description: '\${escapeHtml(method.complexity.description)}', confidence: \${method.complexity.confidence} }, [])">
+                                ✨ improve
+                            </button>
                         </div>
                         <div class="method-complexity">
                             <span class="complexity-badge \${getComplexityClass(method.complexity.notation)}">

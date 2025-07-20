@@ -27,7 +27,8 @@ export function getIndentFromLine(lineText: string): string {
 export function isFunctionDefinition(line: string): boolean {
   const trimmed = line.trim();
   return (
-    trimmed.startsWith(PythonKeywords.DEF + " ") &&
+    (trimmed.startsWith(PythonKeywords.DEF + " ") ||
+      trimmed.startsWith("async " + PythonKeywords.DEF + " ")) &&
     trimmed.includes("(") &&
     trimmed.endsWith(":")
   );
@@ -36,7 +37,18 @@ export function isFunctionDefinition(line: string): boolean {
 // Helper function to extract function name from definition
 export function extractFunctionName(line: string): string {
   const trimmed = line.trim();
-  const defIndex = trimmed.indexOf(PythonKeywords.DEF + " ");
+
+  // Handle both regular and async function definitions
+  let defIndex = trimmed.indexOf(PythonKeywords.DEF + " ");
+  if (defIndex === -1) {
+    // Try async def pattern
+    const asyncDefPattern = `${PythonKeywords.ASYNC} ${PythonKeywords.DEF} `;
+    defIndex = trimmed.indexOf(asyncDefPattern);
+    if (defIndex !== -1) {
+      defIndex += 6; // Skip "async " part (6 characters)
+    }
+  }
+
   const parenIndex = trimmed.indexOf("(");
   if (defIndex !== -1 && parenIndex !== -1) {
     return trimmed.substring(defIndex + 4, parenIndex).trim();

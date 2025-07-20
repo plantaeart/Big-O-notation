@@ -15,7 +15,8 @@ export function countNestedLoops(lines: string[]): number {
     if (
       trimmed === "" ||
       trimmed.startsWith("#") ||
-      trimmed.startsWith(PythonKeywords.DEF + " ")
+      trimmed.startsWith(PythonKeywords.DEF + " ") ||
+      trimmed.startsWith(PythonKeywords.ASYNC + " " + PythonKeywords.DEF + " ")
     ) {
       continue;
     }
