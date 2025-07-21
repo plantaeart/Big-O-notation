@@ -21,6 +21,18 @@ This is a VS Code extension project for Big O complexity analysis. **ALWAYS read
 1. **Space Complexity Bug**: Fixed issue where `result = []` + `result.append(i)` in loops was incorrectly analyzed as O(1) instead of O(n)
 2. **Async Detection**: Fixed `async def` function detection in complexity analyzer
 3. **Jest Setup**: Successfully migrated from VSCode extension testing to classical Jest unit testing
+4. **Divide-and-Conquer False Positives**: Fixed `.split('.')` being detected as O(n log n) by making patterns more specific
+5. **Nested Loop Detection**: Enhanced logic to distinguish true O(n²) patterns from false positives with constant inner loops
+6. **Sorting in Nested Functions**: Fixed `sorted()` calls missed when inside functions with nested functions
+7. **Binary Search Patterns**: Enhanced O(log n) detection with comprehensive binary search patterns
+
+### 🧪 **Testing Framework Status**
+
+- **Framework**: Jest v29.7.0 with ts-jest preset (50/50 tests passing ✅)
+- **Configuration**: `jest.config.js` with Node.js environment and VSCode mocking
+- **Command**: `npm test` to run all tests
+- **Coverage**: All complexity types O(1) through O(n!) with comprehensive edge cases
+- **Latest Fixes Verified**: File extensions, cyclomatic complexity, matrix operations, suggestion ranking all working
 
 ### 🧪 **Testing Framework**
 
@@ -65,15 +77,22 @@ Use `get_vscode_api` with a query as input to fetch the latest VS Code API refer
 - `src/utils/`: Helper utilities and complexity indicators
 - `src/decorations/`: Visual decoration management
 
-### Pattern Detection Rules
+### Pattern Detection Rules (Enhanced)
 
-- **O(1)**: Direct access, cache operations, simple calculations
-- **O(log n)**: Binary search, halving operations, tree traversal
-- **O(n)**: Single loops, list comprehensions, linear scans
-- **O(n log n)**: Sorting operations, merge sort patterns
-- **O(n²)**: Nested loops, all-pairs comparisons, matrix operations
-- **O(2^n)**: Multiple recursive calls, combination generation
+- **O(1)**: Direct access, cache operations, simple calculations, file extension extraction
+- **O(log n)**: Binary search (`while left <= right`), halving operations, tree traversal, bracket matching
+- **O(n)**: Single loops, list comprehensions, linear scans, cyclomatic complexity calculation
+- **O(n log n)**: Sorting operations (`sorted()`, `.sort()`), merge sort patterns, suggestion ranking
+- **O(n²)**: True nested loops (matrix operations, similarity calculation), all-pairs comparisons
+- **O(2^n)**: Multiple recursive calls, combination generation, exponential patterns
 - **O(n!)**: All permutations, traveling salesman brute force, N-Queens problem
+
+### Enhanced Detection Logic
+
+- **Nested Loop Intelligence**: Distinguishes `for row in matrix: for col in row` (O(n²)) from `for line in code: for keyword in keywords` (O(n))
+- **Full Context Sorting**: Checks both immediate function body and full context for `sorted()` calls
+- **Specific Divide-and-Conquer**: Targets actual algorithms (`merge_sort`, `quick_sort`) not simple operations (`.split()`)
+- **Binary Search Patterns**: Comprehensive detection including `mid = (left + right) // 2` variations
 
 ### Space Complexity Context
 

@@ -213,22 +213,35 @@ function analyzeMethodComplexity(
       /math\.log|math\.ceil.*log|log2|log10/.test(line) ||
       /heappush|heappop|heapify/.test(line) ||
       /n\s*\/\/\s*2|n\s*>>=|n\s*>>\s*1/.test(line) ||
-      (/while.*n:|while.*n\s*>/.test(line) && /\/\/\s*2|\/\s*2/.test(line))
+      (/while.*n:|while.*n\s*>/.test(line) && /\/\/\s*2|\/\s*2/.test(line)) ||
+      // Binary search patterns
+      /(left|right).*\/\/\s*2|mid\s*=.*(left|right).*\/\/\s*2/.test(line) ||
+      /while.*left.*<=.*right/.test(line) ||
+      /while.*start.*<=.*end/.test(line)
   );
 
   // Check for O(n log n) patterns (sorting, divide and conquer)
-  const hasSortingPatterns = bodyLines.some(
-    (line) =>
-      /sorted\(|\.sort\(/.test(line) ||
-      /heapify|heappop.*range|heappop.*len/.test(line) ||
-      (/for.*range.*len/.test(line) && /heappop/.test(line))
-  );
+  // Check both bodyLines and fullCodeContext for sorting patterns
+  const hasSortingPatterns =
+    bodyLines.some(
+      (line) =>
+        /\bsorted\(|\.sort\(/.test(line) ||
+        /heapify|heappop.*range|heappop.*len/.test(line) ||
+        (/for.*range.*len/.test(line) && /heappop/.test(line))
+    ) ||
+    (fullCodeContext &&
+      fullCodeContext.some(
+        (line) =>
+          /\bsorted\(|\.sort\(/.test(line) ||
+          /heapify|heappop.*range|heappop.*len/.test(line) ||
+          (/for.*range.*len/.test(line) && /heappop/.test(line))
+      ));
 
   // Check for divide and conquer patterns
   const hasDivideConquer = bodyLines.some(
     (line) =>
       /\[.*for.*if.*<|if.*<.*pivot/.test(line) ||
-      /merge|split|divide/.test(line)
+      /merge_sort|quick_sort|merge\s*\(|divide_and_conquer/.test(line)
   );
 
   // Check for O(n) patterns (single loops, linear operations)
@@ -265,7 +278,7 @@ function analyzeMethodComplexity(
     ) ||
     // Check for actual nested structure by analyzing indentation levels
     (() => {
-      const loopIndentLevels: number[] = [];
+      const loopInfo: Array<{ indent: number; line: string }> = [];
 
       for (const line of bodyLines) {
         const indent = line.length - line.trimStart().length;
@@ -273,23 +286,39 @@ function analyzeMethodComplexity(
 
         // Check if this line contains a loop
         if (/^(for\s+\w+\s+in\s+|while\s+)/.test(trimmedLine)) {
-          loopIndentLevels.push(indent);
+          loopInfo.push({ indent, line: trimmedLine });
         }
       }
 
       // Check if we have loops at different indentation levels (indicating nesting)
-      if (loopIndentLevels.length < 2) {
+      if (loopInfo.length < 2) {
         return false;
       }
 
-      // Sort indentation levels to check for proper nesting
-      const sortedIndents = [...loopIndentLevels].sort((a, b) => a - b);
+      // Sort by indentation to check for proper nesting
+      const sortedLoops = [...loopInfo].sort((a, b) => a.indent - b.indent);
 
-      // If we have loops at different indentation levels, check if they're truly nested
-      // by ensuring there's a significant indentation difference (at least 2 spaces)
-      for (let i = 1; i < sortedIndents.length; i++) {
-        if (sortedIndents[i] - sortedIndents[i - 1] >= 2) {
-          return true; // Found truly nested loops
+      // Check for truly nested loops with significant indentation difference
+      for (let i = 1; i < sortedLoops.length; i++) {
+        const outerLoop = sortedLoops[i - 1];
+        const innerLoop = sortedLoops[i];
+
+        // Must have significant indentation difference (at least 2 spaces)
+        if (innerLoop.indent - outerLoop.indent >= 2) {
+          // Check if inner loop is over a small constant list (like keywords, operators)
+          // This is to avoid false positives where inner loop is over predefined constants
+          const isInnerLoopSmallConstant =
+            /for\s+\w+\s+in\s+(keywords|operators|symbols|["'][^"']{0,20}["'])\s*:?\s*$/.test(
+              innerLoop.line
+            ) ||
+            (/for\s+\w+\s+in\s+\[.*\]\s*:?\s*$/.test(innerLoop.line) &&
+              innerLoop.line.length < 50);
+
+          // Consider it quadratic if inner loop is NOT over a small constant
+          // This allows legitimate nested loops like: for row in matrix + for col in row
+          if (!isInnerLoopSmallConstant) {
+            return true; // Found truly nested loops with variable iteration
+          }
         }
       }
 
