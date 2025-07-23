@@ -120,7 +120,7 @@ for row in matrix:        # Outer: variable size
     for col in row:       # Inner: variable size -> O(n²)
         print(col)
 
-# FALSE O(n²) - Constant inner loop  
+# FALSE O(n²) - Constant inner loop
 for line in code.split('\n'):  # Outer: variable size
     for keyword in keywords:    # Inner: constant size -> O(n)
         if keyword in line:
@@ -137,7 +137,7 @@ def rank_suggestions(suggestions, context):
     def relevance_score(suggestion):  # Nested function
         # ... logic here
         return score
-    
+
     return sorted(suggestions, key=relevance_score)  # This was missed before
 ```
 
@@ -149,8 +149,8 @@ def rank_suggestions(suggestions, context):
 ```typescript
 // Enhanced patterns for O(log n) detection
 /(left|right).*\/\/\s*2|mid\s*=.*(left|right).*\/\/\s*2/.test(line) ||
-/while.*left.*<=.*right/.test(line) ||
-/while.*start.*<=.*end/.test(line)
+  /while.*left.*<=.*right/.test(line) ||
+  /while.*start.*<=.*end/.test(line);
 ```
 
 ### 3. GitHub Copilot Chat Integration
@@ -321,6 +321,7 @@ The analyzer uses multiple detection methods:
 ### Current Test Status (All Passing ✅)
 
 **Test Suite Results**: 50/50 tests passing successfully
+
 - **Test Suites**: 3 passed (complexityHelperUtils, complexityAnalyzer, complexity)
 - **Total Coverage**: All complexity types from O(1) to O(n!)
 - **Edge Cases**: Malformed code, empty functions, async patterns all handled
@@ -330,7 +331,7 @@ The analyzer uses multiple detection methods:
 
 1. **File Extension Extraction**: ✅ Correctly identified as O(1) (was O(n log n))
 2. **Cyclomatic Complexity**: ✅ Correctly identified as O(n) (was O(n²))
-3. **Matrix Operations**: ✅ Correctly identified as O(n²) 
+3. **Matrix Operations**: ✅ Correctly identified as O(n²)
 4. **Code Similarity**: ✅ Correctly identified as O(n²)
 5. **Suggestion Ranking**: ✅ Correctly identified as O(n log n) (was O(n))
 

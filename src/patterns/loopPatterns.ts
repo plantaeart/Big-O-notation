@@ -126,10 +126,8 @@ export function analyzeLoopComplexity(lines: string[]): string {
   // Check for logarithmic patterns (binary search, halving, math operations)
   const hasLogarithmic = lines.some(
     (line) =>
-      // Division by 2 patterns
-      /\/\/\s*2|\/\s*2|\*\s*2/.test(line) ||
-      // Binary search patterns
-      /(left|right).*=.*mid|mid.*=.*\(.*\+.*\)/.test(line) ||
+      // Binary search patterns - more specific context required
+      /(left|right).*=.*mid|mid.*=.*\(.*\+.*\).*\/\/\s*2/.test(line) ||
       /while.*left.*<=.*right/.test(line) ||
       // Math logarithmic functions
       /math\.log|math\.ceil.*log|log2|log10/.test(line) ||
@@ -137,8 +135,8 @@ export function analyzeLoopComplexity(lines: string[]): string {
       /heappush|heappop|heapify/.test(line) ||
       // Binary tree operations
       /binary.*tree|tree.*height/.test(line.toLowerCase()) ||
-      // Bit manipulation (counting bits)
-      /while.*n:|n\s*\/\/\s*2|n\s*>>=|n\s*>>\s*1/.test(line)
+      // Bit manipulation (counting bits) - must be in loop context
+      (/while.*n:/.test(line) && /n\s*\/\/\s*2|n\s*>>=|n\s*>>\s*1/.test(line))
   );
 
   // Special case: if we have logarithmic patterns but no loops, it's still O(log n)

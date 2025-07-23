@@ -213,9 +213,10 @@ function analyzeMethodComplexity(
       /math\.log|math\.ceil.*log|log2|log10/.test(line) ||
       /heappush|heappop|heapify/.test(line) ||
       /n\s*\/\/\s*2|n\s*>>=|n\s*>>\s*1/.test(line) ||
-      (/while.*n:|while.*n\s*>/.test(line) && /\/\/\s*2|\/\s*2/.test(line)) ||
-      // Binary search patterns
-      /(left|right).*\/\/\s*2|mid\s*=.*(left|right).*\/\/\s*2/.test(line) ||
+      (/while.*n\s*[><=]/.test(line) && /n\s*\/\/\s*2/.test(line)) ||
+      // Binary search patterns - more specific to avoid false positives
+      /mid\s*=.*\(.*left.*\+.*right.*\).*\/\/\s*2/.test(line) ||
+      /(left|right).*mid.*\/\/\s*2/.test(line) ||
       /while.*left.*<=.*right/.test(line) ||
       /while.*start.*<=.*end/.test(line)
   );
@@ -248,7 +249,7 @@ function analyzeMethodComplexity(
   const hasLinearPatterns = bodyLines.some(
     (line) =>
       /for\s+\w+\s+in\s+\w+:|for\s+.*enumerate\(/.test(line) ||
-      /sum\(|max\(|min\(|len\(/.test(line) ||
+      /sum\(|max\(|min\(/.test(line) ||
       /\.count\(|\.index\(|\.remove\(/.test(line) ||
       /list\(|tuple\(|set\(/.test(line) ||
       /reversed\(/.test(line)
@@ -571,6 +572,7 @@ function analyzeMethodComplexity(
       trimmed.startsWith(PythonKeywords.IF) ||
       /^[a-zA-Z_]\w*\s*=/.test(trimmed) ||
       /^[a-zA-Z_]\w*\s*\[/.test(trimmed) ||
+      /len\(/.test(trimmed) ||
       trimmed === PythonKeywords.PASS
     );
   });
