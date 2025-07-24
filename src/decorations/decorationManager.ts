@@ -40,8 +40,14 @@ export function applyComplexityDecorations(editor: vscode.TextEditor): void {
     const line = document.lineAt(i);
     const text = line.text;
 
-    // Look for complexity indicators in comments
-    if (text.trim().startsWith("#") && text.includes("Time:")) {
+    // Look for complexity indicators in analyzer-generated comments only
+    // Pattern: # INDICATOR Time: O(...) | INDICATOR Space: O(...)
+    if (
+      text.trim().startsWith("#") &&
+      text.includes("Time:") &&
+      text.includes("Space:") &&
+      text.includes("|")
+    ) {
       const excellentMatch = getMatchDecorationType(
         text,
         COMPLEXITY_INDICATOR.EXCELLENT

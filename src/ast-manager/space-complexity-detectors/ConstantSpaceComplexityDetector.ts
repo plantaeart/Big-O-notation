@@ -1,6 +1,6 @@
 import Parser from "tree-sitter";
 import { SpaceComplexityPatternDetector } from "./SpaceComplexityPatternDetector";
-import { ComplexityNode } from "../models/ComplexityNode";
+import { ComplexityNode } from "../../models/ComplexityNode";
 
 /**
  * Detector for O(1) constant space complexity

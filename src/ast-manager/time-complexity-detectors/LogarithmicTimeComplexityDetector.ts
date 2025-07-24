@@ -2,7 +2,7 @@ import { TimeComplexityPatternDetector } from "./TimeComplexityPatternDetector";
 import {
   ComplexityPattern,
   ComplexityAnalysisContext,
-} from "../models/ComplexityNode";
+} from "../../models/ComplexityNode";
 
 export class LogarithmicTimeComplexityDetector extends TimeComplexityPatternDetector {
   protected readonly complexityNotation = "O(log n)";

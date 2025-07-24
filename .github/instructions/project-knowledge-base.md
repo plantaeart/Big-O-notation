@@ -141,6 +141,27 @@ def rank_suggestions(suggestions, context):
     return sorted(suggestions, key=relevance_score)  # This was missed before
 ```
 
+### 7. Comment Placement Bug (Latest Fix)
+
+**Problem**: When files already had complexity comments, the analyzer added new comments **inside function bodies** instead of replacing existing comments above function definitions.
+
+**Root Cause**: Line number indexing mismatch between AST analyzer (1-indexed) and VSCode API (0-indexed).
+
+**Solution**: Fixed line number conversion in `commentManager.ts`:
+
+```typescript
+// Before: Used 1-indexed line numbers directly
+const lineStart = method.lineStart;
+
+// After: Convert to 0-indexed for VSCode APIs
+const lineStart = method.lineStart - 1; // Convert from 1-indexed to 0-indexed
+```
+
+**Expected Behavior**:
+
+- ✅ **No existing comments**: Adds comments above function definitions
+- ✅ **With existing comments**: Replaces existing comments, doesn't add inside functions
+
 ### 6. Binary Search Pattern Enhancement (Latest Fix)
 
 **Problem**: Binary search patterns were not consistently detected

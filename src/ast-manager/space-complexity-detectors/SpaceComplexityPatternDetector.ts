@@ -1,5 +1,5 @@
 import Parser from "tree-sitter";
-import { ComplexityNode } from "../models/ComplexityNode";
+import { ComplexityNode } from "../../models/ComplexityNode";
 
 /**
  * Base class for all space complexity pattern detectors

@@ -2,7 +2,7 @@ import { TimeComplexityPatternDetector } from "./TimeComplexityPatternDetector";
 import {
   ComplexityPattern,
   ComplexityAnalysisContext,
-} from "../models/ComplexityNode";
+} from "../../models/ComplexityNode";
 
 export class ExponentialTimeComplexityDetector extends TimeComplexityPatternDetector {
   protected readonly complexityNotation = "O(2^n)";

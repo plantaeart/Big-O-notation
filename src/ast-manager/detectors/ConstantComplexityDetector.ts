@@ -1,17 +1,10 @@
-import { TimeComplexityPatternDetector } from "./TimeComplexityPatternDetector";
+import { ComplexityPatternDetector } from "./ComplexityPatternDetector";
 import {
   ComplexityPattern,
   ComplexityAnalysisContext,
 } from "../../models/ComplexityNode";
-import { AST_NODE_TYPES } from "../../constants/ASTNodeTypes";
-import { ALGORITHM_KEYWORDS } from "../../constants/AlgorithmKeywords";
-import {
-  traverseAST,
-  findNodesByType,
-  isMathOperation,
-} from "../utils/ASTUtils";
 
-export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetector {
+export class ConstantComplexityDetector extends ComplexityPatternDetector {
   protected readonly complexityNotation = "O(1)";
   protected readonly minConfidence = 50;
 
@@ -66,32 +59,29 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
     const noLoops = node.forLoopCount === 0 && node.whileLoopCount === 0;
     const noRecursion = node.recursiveCallCount === 0;
 
-    // Also check for list comprehensions, which are O(n) loops
-    let hasListComprehensions = false;
-    traverseAST(node.astNode, (astNode) => {
-      if (
-        astNode.type === AST_NODE_TYPES.LIST_COMPREHENSION ||
-        astNode.type === AST_NODE_TYPES.SET_COMPREHENSION ||
-        astNode.type === AST_NODE_TYPES.DICTIONARY_COMPREHENSION
-      ) {
-        hasListComprehensions = true;
-      }
-    });
-
-    return noLoops && noRecursion && !hasListComprehensions;
+    return noLoops && noRecursion;
   }
 
   private detectDirectAccess(node: any): boolean {
+    const directAccessKeywords = [
+      "get",
+      "set",
+      "access",
+      "index",
+      "key",
+      "hash",
+      "dict",
+      "map",
+    ];
+
     const hasDirectAccessKeywords = node.keywords.some((kw: string) =>
-      ALGORITHM_KEYWORDS.DIRECT_ACCESS.some((keyword) =>
-        kw.toLowerCase().includes(keyword)
-      )
+      directAccessKeywords.some((keyword) => kw.toLowerCase().includes(keyword))
     );
 
     // Look for direct indexing operations
     let hasDirectIndexing = false;
-    traverseAST(node.astNode, (astNode) => {
-      if (astNode.type === AST_NODE_TYPES.SUBSCRIPT) {
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "subscript") {
         // Check if it's simple indexing (not in a loop)
         hasDirectIndexing = true;
       }
@@ -101,19 +91,35 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
   }
 
   private detectMathematicalOps(node: any): boolean {
+    const mathKeywords = [
+      "add",
+      "subtract",
+      "multiply",
+      "divide",
+      "mod",
+      "abs",
+      "max",
+      "min",
+      "round",
+      "floor",
+      "ceil",
+      "sqrt",
+      "pow",
+    ];
+
     const hasMathKeywords = node.keywords.some((kw: string) =>
-      ALGORITHM_KEYWORDS.MATH_FUNCTIONS.some((keyword) =>
-        kw.toLowerCase().includes(keyword)
-      )
+      mathKeywords.some((keyword) => kw.toLowerCase().includes(keyword))
     );
 
     // Look for mathematical operators
     let hasMathOperations = false;
-    traverseAST(node.astNode, (astNode) => {
-      if (astNode.type === AST_NODE_TYPES.BINARY_OPERATOR) {
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "binary_operator") {
         const operator = astNode.text;
         if (
-          ALGORITHM_KEYWORDS.MATH_OPERATORS.some((op) => operator.includes(op))
+          ["+", "-", "*", "/", "%", "//", "**"].some((op) =>
+            operator.includes(op)
+          )
         ) {
           hasMathOperations = true;
         }
@@ -124,8 +130,21 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
   }
 
   private detectConstantKeywords(node: any): boolean {
+    const constantIndicators = [
+      "constant",
+      "o1",
+      "direct",
+      "immediate",
+      "instant",
+      "cache",
+      "lookup",
+      "hash",
+      "map",
+      "dict",
+    ];
+
     return node.keywords.some((kw: string) =>
-      ALGORITHM_KEYWORDS.CONSTANT_INDICATORS.some((indicator) =>
+      constantIndicators.some((indicator) =>
         kw.toLowerCase().includes(indicator)
       )
     );
@@ -134,11 +153,11 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
   private detectFixedOperations(node: any): boolean {
     // Check if function has very few statements
     let statementCount = 0;
-    traverseAST(node.astNode, (astNode) => {
+    this.traverseAST(node.astNode, (astNode) => {
       if (
-        astNode.type === AST_NODE_TYPES.EXPRESSION_STATEMENT ||
-        astNode.type === AST_NODE_TYPES.ASSIGNMENT ||
-        astNode.type === AST_NODE_TYPES.RETURN_STATEMENT
+        astNode.type === "expression_statement" ||
+        astNode.type === "assignment" ||
+        astNode.type === "return_statement"
       ) {
         statementCount++;
       }
@@ -149,8 +168,8 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
 
     // Look for simple variable assignments
     let hasSimpleAssignments = false;
-    traverseAST(node.astNode, (astNode) => {
-      if (astNode.type === AST_NODE_TYPES.ASSIGNMENT) {
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "assignment") {
         const assignText = astNode.text;
         // Simple assignments without complex operations
         if (!assignText.includes("(") || assignText.split("(").length <= 2) {

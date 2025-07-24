@@ -2,7 +2,7 @@ import { TimeComplexityPatternDetector } from "./TimeComplexityPatternDetector";
 import {
   ComplexityPattern,
   ComplexityAnalysisContext,
-} from "../models/ComplexityNode";
+} from "../../models/ComplexityNode";
 import { SyntaxNode } from "tree-sitter";
 
 export class CubicTimeComplexityDetector extends TimeComplexityPatternDetector {

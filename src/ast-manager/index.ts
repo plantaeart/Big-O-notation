@@ -18,4 +18,4 @@ export { ConstantSpaceComplexityDetector } from "./space-complexity-detectors/Co
 export { LinearSpaceComplexityDetector } from "./space-complexity-detectors/LinearSpaceComplexityDetector";
 
 // Export models
-export * from "./models/ComplexityNode";
+export * from "../models/ComplexityNode";

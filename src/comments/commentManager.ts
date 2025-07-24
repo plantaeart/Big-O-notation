@@ -20,10 +20,15 @@ export async function addBigOComments(
   const edits: vscode.TextEdit[] = [];
 
   for (const method of methods) {
-    const lineStart = method.lineStart;
+    const lineStart = method.lineStart - 1; // Convert from 1-indexed to 0-indexed for VSCode
     const line = document.lineAt(lineStart);
     const lineText = line.text;
     const indent = getIndentFromLine(lineText);
+
+    console.log(
+      `Processing method: ${method.name} at line ${method.lineStart} (0-indexed: ${lineStart})`
+    );
+    console.log(`Function line: "${lineText.trim()}"`);
 
     // Check if Big-O comment already exists above the function
     const prevLineIndex = lineStart - 1;
@@ -33,17 +38,21 @@ export async function addBigOComments(
     if (prevLineIndex >= 0) {
       const prevLine = document.lineAt(prevLineIndex);
       const trimmedLine = prevLine.text.trim();
+      console.log(`Previous line (${prevLineIndex}): "${trimmedLine}"`);
 
-      // Check for various Big-O comment patterns
+      // Check for various Big-O comment patterns - only match analyzer-generated comments
       if (
+        (trimmedLine.includes("Time:") &&
+          trimmedLine.includes("Space:") &&
+          trimmedLine.includes("|")) ||
         trimmedLine.startsWith("# Big-O:") ||
-        trimmedLine.startsWith("# Time:") ||
-        (trimmedLine.includes("Time:") && trimmedLine.includes("Space:")) ||
-        /^#.*O\([^)]*\)/.test(trimmedLine) ||
-        /^#\s*(EXCELLENT|GOOD|FAIR|POOR|BAD|TERRIBLE|UNKNOWN)/.test(trimmedLine)
+        /^#\s*(EXCELLENT|GOOD|FAIR|POOR|BAD|TERRIBLE|UNKNOWN)\s+Time:.*Space:/.test(
+          trimmedLine
+        )
       ) {
         hasExistingComment = true;
         commentLineIndex = prevLineIndex;
+        console.log(`Found existing comment at line ${prevLineIndex}`);
       }
     }
 

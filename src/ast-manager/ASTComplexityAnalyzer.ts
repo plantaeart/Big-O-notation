@@ -1,133 +1,32 @@
 import { SyntaxNode } from "tree-sitter";
-import Parser from "tree-sitter";
-import Python from "tree-sitter-python";
 import {
   ComplexityNode,
   ComplexityPattern,
   ComplexityAnalysisContext,
 } from "../models/ComplexityNode";
-import { ComplexityAnalysisResult } from "../models/ComplexityAnalysisResult.model";
-import { MethodAnalysis } from "../models/MethodAnalysis.model";
-import { SpaceComplexityResult } from "../models/SpaceComplexityResult.model";
 import { TimeComplexityPatternDetector } from "./time-complexity-detectors/TimeComplexityPatternDetector";
 import { FactorialTimeComplexityDetector } from "./time-complexity-detectors/FactorialTimeComplexityDetector";
 import { ExponentialTimeComplexityDetector } from "./time-complexity-detectors/ExponentialTimeComplexityDetector";
-import { CubicTimeComplexityDetector } from "./time-complexity-detectors/CubicTimeComplexityDetector";
 import { QuadraticTimeComplexityDetector } from "./time-complexity-detectors/QuadraticTimeComplexityDetector";
 import { LinearithmicTimeComplexityDetector } from "./time-complexity-detectors/LinearithmicTimeComplexityDetector";
 import { LinearTimeComplexityDetector } from "./time-complexity-detectors/LinearTimeComplexityDetector";
 import { LogarithmicTimeComplexityDetector } from "./time-complexity-detectors/LogarithmicTimeComplexityDetector";
 import { ConstantTimeComplexityDetector } from "./time-complexity-detectors/ConstantTimeComplexityDetector";
 
-export class ASTTimeComplexityAnalyzer {
+export class ASTComplexityAnalyzer {
   private detectors: TimeComplexityPatternDetector[];
-  private parser: Parser;
 
   constructor() {
-    // Initialize parser
-    this.parser = new Parser();
-    try {
-      this.parser.setLanguage(Python as any);
-    } catch (error) {
-      console.warn("Failed to set Python language for parser:", error);
-    }
-
     // Initialize detectors in priority order (highest to lowest complexity)
     this.detectors = [
       new FactorialTimeComplexityDetector(), // O(n!)
-      new LinearithmicTimeComplexityDetector(), // O(n log n) - check before exponential for divide-and-conquer
       new ExponentialTimeComplexityDetector(), // O(2^n)
-      new CubicTimeComplexityDetector(), // O(n³)
-      new QuadraticTimeComplexityDetector(), // O(n²)
+      new QuadraticTimeComplexityDetector(), // O(n²) - Adding Cubic would go here
+      new LinearithmicTimeComplexityDetector(), // O(n log n)
       new LinearTimeComplexityDetector(), // O(n)
       new LogarithmicTimeComplexityDetector(), // O(log n)
       new ConstantTimeComplexityDetector(), // O(1)
     ];
-  }
-
-  /**
-   * Analyze time complexity of Python code
-   * @param code - Python source code as string
-   * @returns ComplexityAnalysisResult with time complexity information
-   */
-  analyzeCodeTimeComplexity(code: string): ComplexityAnalysisResult {
-    try {
-      const tree = this.parser.parse(code);
-      const rootNode = tree.rootNode;
-
-      const methods: MethodAnalysis[] = [];
-      this.findFunctions(rootNode, methods);
-
-      // Analyze each function with time complexity detectors
-      for (const method of methods) {
-        if ((method as any).astNode) {
-          const complexity = this.analyzeFunction(
-            (method as any).astNode,
-            method.name
-          );
-
-          if (complexity) {
-            method.complexity = {
-              notation: complexity.notation,
-              description: complexity.reasons.join(", "),
-              confidence: complexity.confidence,
-            };
-          }
-        }
-      }
-
-      return {
-        methods,
-        hierarchy: new Map<string, string[]>(),
-      };
-    } catch (error) {
-      console.error("Error in time complexity analysis:", error);
-      return {
-        methods: [],
-        hierarchy: new Map<string, string[]>(),
-      };
-    }
-  }
-
-  /**
-   * Find all function definitions in the AST
-   */
-  private findFunctions(node: SyntaxNode, methods: MethodAnalysis[]): void {
-    if (node.type === "function_definition") {
-      const nameNode = node.child(1);
-      const functionName = nameNode ? nameNode.text : "unknown";
-
-      const defaultSpaceComplexity: SpaceComplexityResult = {
-        notation: "O(1)",
-        description: "Default space complexity",
-        confidence: 50,
-        dataStructures: [],
-      };
-
-      const methodAnalysis: MethodAnalysis = {
-        name: functionName,
-        lineStart: node.startPosition.row + 1,
-        lineEnd: node.endPosition.row + 1,
-        complexity: {
-          notation: "O(1)",
-          description: "Not analyzed",
-          confidence: 0,
-        },
-        spaceComplexity: defaultSpaceComplexity,
-        explanation: "AST-manager time complexity analysis",
-      };
-
-      // Store AST node for analysis
-      (methodAnalysis as any).astNode = node;
-      methods.push(methodAnalysis);
-    }
-
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (child) {
-        this.findFunctions(child, methods);
-      }
-    }
   }
 
   /**
@@ -378,16 +277,6 @@ export class ASTTimeComplexityAnalyzer {
       "heappush",
       "heappop",
       "heapify",
-      // Tree operations
-      "tree",
-      "root",
-      "node",
-      "left",
-      "right",
-      "parent",
-      "child",
-      "bst",
-      "val",
       // Built-in functions
       "sum",
       "max",
@@ -396,7 +285,6 @@ export class ASTTimeComplexityAnalyzer {
       "count",
       "index",
       "range",
-      "enumerate",
       // Algorithm keywords
       "merge",
       "partition",

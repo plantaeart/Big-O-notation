@@ -5,7 +5,7 @@ import {
   ComplexityAnalysisContext,
 } from "../../models/ComplexityNode";
 
-export abstract class TimeComplexityPatternDetector {
+export abstract class ComplexityPatternDetector {
   protected abstract readonly complexityNotation: string;
   protected abstract readonly minConfidence: number;
 
