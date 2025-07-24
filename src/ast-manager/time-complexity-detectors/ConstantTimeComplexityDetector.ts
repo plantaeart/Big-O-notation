@@ -3,8 +3,10 @@ import {
   ComplexityPattern,
   ComplexityAnalysisContext,
 } from "../../models/ComplexityNode";
-import { AST_NODE_TYPES } from "../../constants/ASTNodeTypes";
+import { AST_NODE_TYPES, AST_NODE_GROUPS } from "../../constants/ASTNodeTypes";
 import { ALGORITHM_KEYWORDS } from "../../constants/AlgorithmKeywords";
+import { TimeComplexityNotation } from "../../constants/timeComplexityNotationsConst";
+import { PythonKeywords } from "../../constants/pythonKeyWordsConst";
 import {
   traverseAST,
   findNodesByType,
@@ -12,7 +14,7 @@ import {
 } from "../utils/ASTUtils";
 
 export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetector {
-  protected readonly complexityNotation = "O(1)";
+  protected readonly complexityNotation = TimeComplexityNotation.CONSTANT;
   protected readonly minConfidence = 50;
 
   detect(context: ComplexityAnalysisContext): ComplexityPattern | null {
@@ -69,11 +71,7 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
     // Also check for list comprehensions, which are O(n) loops
     let hasListComprehensions = false;
     traverseAST(node.astNode, (astNode) => {
-      if (
-        astNode.type === AST_NODE_TYPES.LIST_COMPREHENSION ||
-        astNode.type === AST_NODE_TYPES.SET_COMPREHENSION ||
-        astNode.type === AST_NODE_TYPES.DICTIONARY_COMPREHENSION
-      ) {
+      if (AST_NODE_GROUPS.COMPREHENSIONS.includes(astNode.type as any)) {
         hasListComprehensions = true;
       }
     });
@@ -103,18 +101,18 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
   private detectMathematicalOps(node: any): boolean {
     // Linear operations that should NOT be considered constant
     const linearOps = [
-      "sum",
-      "max",
-      "min",
-      "count",
-      "index",
-      "reversed",
-      "reverse",
-      "sort",
-      "sorted",
+      PythonKeywords.SUM,
+      PythonKeywords.MAX,
+      PythonKeywords.MIN,
+      PythonKeywords.COUNT,
+      PythonKeywords.INDEX,
+      PythonKeywords.REVERSE,
+      PythonKeywords.SORT,
+      PythonKeywords.SORTED,
+      "reversed", // not in PythonKeywords but should be excluded
     ];
 
-    // Note: "len" is O(1) in Python, so we don't exclude it
+    // Note: PythonKeywords.LEN is O(1) in Python, so we don't exclude it
 
     const functionText = node.astNode.text.toLowerCase();
 
@@ -162,11 +160,7 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
     // Check if function has very few statements
     let statementCount = 0;
     traverseAST(node.astNode, (astNode) => {
-      if (
-        astNode.type === AST_NODE_TYPES.EXPRESSION_STATEMENT ||
-        astNode.type === AST_NODE_TYPES.ASSIGNMENT ||
-        astNode.type === AST_NODE_TYPES.RETURN_STATEMENT
-      ) {
+      if (AST_NODE_GROUPS.STATEMENTS.includes(astNode.type as any)) {
         statementCount++;
       }
     });

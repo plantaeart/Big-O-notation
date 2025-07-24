@@ -3,9 +3,10 @@ import {
   ComplexityPattern,
   ComplexityAnalysisContext,
 } from "../../models/ComplexityNode";
+import { TimeComplexityNotation } from "../../constants/timeComplexityNotationsConst";
 
 export class LogarithmicTimeComplexityDetector extends TimeComplexityPatternDetector {
-  protected readonly complexityNotation = "O(log n)";
+  protected readonly complexityNotation = TimeComplexityNotation.LOGARITHMIC;
   protected readonly minConfidence = 70;
 
   detect(context: ComplexityAnalysisContext): ComplexityPattern | null {

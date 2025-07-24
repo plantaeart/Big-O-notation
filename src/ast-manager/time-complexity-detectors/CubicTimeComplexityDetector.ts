@@ -4,9 +4,10 @@ import {
   ComplexityAnalysisContext,
 } from "../../models/ComplexityNode";
 import { SyntaxNode } from "tree-sitter";
+import { TimeComplexityNotation } from "../../constants/timeComplexityNotationsConst";
 
 export class CubicTimeComplexityDetector extends TimeComplexityPatternDetector {
-  protected readonly complexityNotation = "O(n³)";
+  protected readonly complexityNotation = TimeComplexityNotation.CUBIC;
   protected readonly minConfidence = 70;
 
   detect(context: ComplexityAnalysisContext): ComplexityPattern | null {

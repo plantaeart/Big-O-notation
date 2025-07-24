@@ -1,13 +1,14 @@
 import Parser from "tree-sitter";
 import { SpaceComplexityPatternDetector } from "./SpaceComplexityPatternDetector";
 import { ComplexityNode } from "../../models/ComplexityNode";
+import { TimeComplexityNotation } from "../../constants/timeComplexityNotationsConst";
 
 /**
  * Detector for O(n) linear space complexity
  * Identifies functions that use space proportional to input size
  */
 export class LinearSpaceComplexityDetector extends SpaceComplexityPatternDetector {
-  readonly notation = "O(n)";
+  readonly notation = TimeComplexityNotation.LINEAR;
   readonly confidence = 90;
   readonly priority = 10; // Higher priority than O(1)
 

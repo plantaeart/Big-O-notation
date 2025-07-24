@@ -1,13 +1,14 @@
 import Parser from "tree-sitter";
 import { SpaceComplexityPatternDetector } from "./SpaceComplexityPatternDetector";
 import { ComplexityNode } from "../../models/ComplexityNode";
+import { TimeComplexityNotation } from "../../constants/timeComplexityNotationsConst";
 
 /**
  * Detector for O(1) constant space complexity
  * Identifies functions that use constant space regardless of input size
  */
 export class ConstantSpaceComplexityDetector extends SpaceComplexityPatternDetector {
-  readonly notation = "O(1)";
+  readonly notation = TimeComplexityNotation.CONSTANT;
   readonly confidence = 95;
   readonly priority = 1; // Lowest priority - check after other patterns
 

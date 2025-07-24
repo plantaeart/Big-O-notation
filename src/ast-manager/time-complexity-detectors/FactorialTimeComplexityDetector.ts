@@ -3,9 +3,10 @@ import {
   ComplexityPattern,
   ComplexityAnalysisContext,
 } from "../../models/ComplexityNode";
+import { TimeComplexityNotation } from "../../constants/timeComplexityNotationsConst";
 
 export class FactorialTimeComplexityDetector extends TimeComplexityPatternDetector {
-  protected readonly complexityNotation = "O(n!)";
+  protected readonly complexityNotation = TimeComplexityNotation.FACTORIAL;
   protected readonly minConfidence = 70;
 
   detect(context: ComplexityAnalysisContext): ComplexityPattern | null {

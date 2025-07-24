@@ -3,9 +3,10 @@ import {
   ComplexityPattern,
   ComplexityAnalysisContext,
 } from "../../models/ComplexityNode";
+import { TimeComplexityNotation } from "../../constants/timeComplexityNotationsConst";
 
 export class QuadraticTimeComplexityDetector extends TimeComplexityPatternDetector {
-  protected readonly complexityNotation = "O(n²)";
+  protected readonly complexityNotation = TimeComplexityNotation.QUADRATIC;
   protected readonly minConfidence = 70;
 
   detect(context: ComplexityAnalysisContext): ComplexityPattern | null {

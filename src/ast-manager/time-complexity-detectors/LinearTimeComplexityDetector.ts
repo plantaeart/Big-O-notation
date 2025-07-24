@@ -5,6 +5,7 @@ import {
 } from "../../models/ComplexityNode";
 import { AST_NODE_TYPES } from "../../constants/ASTNodeTypes";
 import { ALGORITHM_KEYWORDS } from "../../constants/AlgorithmKeywords";
+import { TimeComplexityNotation } from "../../constants/timeComplexityNotationsConst";
 import {
   traverseAST,
   getLoopNodes,
@@ -12,7 +13,7 @@ import {
 } from "../utils/ASTUtils";
 
 export class LinearTimeComplexityDetector extends TimeComplexityPatternDetector {
-  protected readonly complexityNotation = "O(n)";
+  protected readonly complexityNotation = TimeComplexityNotation.LINEAR;
   protected readonly minConfidence = 60;
 
   detect(context: ComplexityAnalysisContext): ComplexityPattern | null {
