@@ -168,7 +168,7 @@ export abstract class TimeComplexityPatternDetector {
   ): ComplexityPattern {
     return {
       notation: this.complexityNotation,
-      confidence,
+      confidence: Math.min(confidence, 100), // Cap confidence at 100%
       patterns,
       reasons,
     };

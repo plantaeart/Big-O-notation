@@ -497,15 +497,7 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
     }
 
     // Check for merge pattern - REQUIRED for O(n log n)
-    if (
-      functionText.includes("merge") ||
-      functionText.includes("combine") ||
-      functionText.includes("concat") ||
-      functionText.includes("extend") ||
-      functionText.includes("append")
-    ) {
-      hasMergePattern = true;
-    }
+    // Look for merge operations in the function body, not the function name
 
     // Must have explicit merge/combine operation for O(n log n)
     this.traverseAST(node.astNode, (astNode) => {
@@ -519,22 +511,35 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
         ) {
           hasRecursiveStructure = true;
         }
-      }
 
-      // Look for linear work (merge operations, extends, etc.)
-      if (astNode.type === "call") {
-        const callText = astNode.text.toLowerCase();
+        // Check for merge-like operations in assignments
         if (
-          callText.includes("merge") ||
-          callText.includes("extend") ||
-          callText.includes("append") ||
-          callText.includes("combine")
+          assignText.includes("merge") ||
+          assignText.includes("combine") ||
+          assignText.includes("concat") ||
+          assignText.includes("+") // Simple concatenation
         ) {
+          hasMergePattern = true;
           hasLinearWork = true;
         }
       }
 
-      // Look for loops that do linear work
+      // Look for merge function calls
+      if (astNode.type === "call") {
+        const callText = astNode.text.toLowerCase();
+        if (
+          callText.includes("merge(") ||
+          callText.includes("combine(") ||
+          callText.includes("concat(") ||
+          callText.includes("extend(") ||
+          callText.includes("append(")
+        ) {
+          hasMergePattern = true;
+          hasLinearWork = true;
+        }
+      }
+
+      // Look for loops that do linear work (merge operations)
       if (
         astNode.type === "for_statement" ||
         astNode.type === "while_statement"
@@ -545,6 +550,7 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
           loopText.includes("merge") ||
           loopText.includes("combine")
         ) {
+          hasMergePattern = true;
           hasLinearWork = true;
         }
       }
@@ -599,12 +605,21 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
         }
       }
 
-      // Look for linear work (loops, merges, combines)
+      // Look for linear work (only loops that do merge/combine operations)
       if (
         astNode.type === "for_statement" ||
         astNode.type === "while_statement"
       ) {
-        hasLinearWork = true;
+        const loopText = astNode.text.toLowerCase();
+        if (
+          loopText.includes("merge") ||
+          loopText.includes("combine") ||
+          loopText.includes("extend") ||
+          loopText.includes("append") ||
+          loopText.includes("result")
+        ) {
+          hasLinearWork = true;
+        }
       }
 
       if (astNode.type === "call") {
@@ -620,13 +635,25 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
       }
     });
 
-    // MODIFIED: Accept divide-and-conquer pattern even without linear work
-    // if it has the right structure and keywords
+    // FIXED: More nuanced approach to divide-and-conquer complexity
+    // 1. If we have explicit merge operations -> definitely O(n log n)
+    // 2. If we have divide-and-conquer structure but name suggests incomplete merge sort -> O(log n)
+    // 3. Otherwise, follow original logic for compatibility
+
+    const isIncompleteMergeSort =
+      functionText.includes("merge") &&
+      !hasLinearWork &&
+      hasDividePattern &&
+      hasRecursiveStructure;
+
+    if (isIncompleteMergeSort) {
+      return false; // Let logarithmic detector handle this
+    }
+
+    // For other divide-and-conquer patterns, require either linear work OR classic structure
     const hasClassicDACStructure = hasDividePattern && hasRecursiveStructure;
     const hasLinearDACWork = hasClassicDACStructure && hasLinearWork;
 
-    // For true O(n log n), prefer patterns with linear work
-    // But also accept classic divide-and-conquer patterns for compatibility
     return hasLinearDACWork || hasClassicDACStructure;
   }
 }

@@ -39,8 +39,8 @@ export class ASTTimeComplexityAnalyzer {
       new ExponentialTimeComplexityDetector(), // O(2^n)
       new CubicTimeComplexityDetector(), // O(n³)
       new QuadraticTimeComplexityDetector(), // O(n²)
+      new LogarithmicTimeComplexityDetector(), // O(log n) - check before linear for binary search patterns
       new LinearTimeComplexityDetector(), // O(n)
-      new LogarithmicTimeComplexityDetector(), // O(log n)
       new ConstantTimeComplexityDetector(), // O(1)
     ];
   }
@@ -58,7 +58,9 @@ export class ASTTimeComplexityAnalyzer {
       const methods: MethodAnalysis[] = [];
       this.findFunctions(rootNode, methods);
 
-      // Analyze each function with time complexity detectors
+      // First pass: Analyze each function independently
+      const functionComplexities = new Map<string, ComplexityPattern>();
+
       for (const method of methods) {
         if ((method as any).astNode) {
           const complexity = this.analyzeFunction(
@@ -67,6 +69,7 @@ export class ASTTimeComplexityAnalyzer {
           );
 
           if (complexity) {
+            functionComplexities.set(method.name, complexity);
             method.complexity = {
               notation: complexity.notation,
               description: complexity.reasons.join(", "),
@@ -76,9 +79,13 @@ export class ASTTimeComplexityAnalyzer {
         }
       }
 
+      // Second pass: Build call hierarchy and propagate complexities
+      const callHierarchy = this.buildCallHierarchy(rootNode, methods);
+      this.propagateComplexities(methods, functionComplexities, callHierarchy);
+
       return {
         methods,
-        hierarchy: new Map<string, string[]>(),
+        hierarchy: callHierarchy,
       };
     } catch (error) {
       console.error("Error in time complexity analysis:", error);
@@ -461,5 +468,156 @@ export class ASTTimeComplexityAnalyzer {
     });
 
     return keywords;
+  }
+
+  /**
+   * Builds call hierarchy by analyzing function calls within each function
+   */
+  private buildCallHierarchy(
+    rootNode: SyntaxNode,
+    methods: MethodAnalysis[]
+  ): Map<string, string[]> {
+    const callHierarchy = new Map<string, string[]>();
+    const functionNames = new Set(methods.map((m) => m.name));
+
+    for (const method of methods) {
+      const calledFunctions: string[] = [];
+      const astNode = (method as any).astNode;
+
+      if (astNode) {
+        this.traverseAST(astNode, (node) => {
+          if (node.type === "call" && node.childCount > 0) {
+            const functionCallNode = node.child(0);
+            if (functionCallNode) {
+              const calledFunctionName = functionCallNode.text;
+              // Only track calls to functions that are defined in this code
+              if (
+                functionNames.has(calledFunctionName) &&
+                calledFunctionName !== method.name
+              ) {
+                if (!calledFunctions.includes(calledFunctionName)) {
+                  calledFunctions.push(calledFunctionName);
+                }
+              }
+            }
+          }
+        });
+      }
+
+      callHierarchy.set(method.name, calledFunctions);
+    }
+
+    return callHierarchy;
+  }
+
+  /**
+   * Propagates complexities from called functions to calling functions
+   * Uses the highest complexity among all operations (own + called functions)
+   */
+  private propagateComplexities(
+    methods: MethodAnalysis[],
+    functionComplexities: Map<string, ComplexityPattern>,
+    callHierarchy: Map<string, string[]>
+  ): void {
+    const complexityOrder = [
+      "O(n!)",
+      "O(2^n)",
+      "O(n³)",
+      "O(n²)",
+      "O(n log n)",
+      "O(n)",
+      "O(log n)",
+      "O(1)",
+    ];
+
+    // Helper function to get complexity priority (lower number = higher complexity)
+    const getComplexityPriority = (notation: string): number => {
+      const index = complexityOrder.indexOf(notation);
+      return index === -1 ? complexityOrder.length : index;
+    };
+
+    // Helper function to get highest complexity from a list
+    const getHighestComplexity = (complexities: string[]): string => {
+      return complexities.reduce((highest, current) => {
+        return getComplexityPriority(current) < getComplexityPriority(highest)
+          ? current
+          : highest;
+      }, "O(1)");
+    };
+
+    // Process functions in dependency order (functions with no calls first)
+    const processed = new Set<string>();
+    const processing = new Set<string>();
+
+    const processFunction = (functionName: string): string => {
+      if (processed.has(functionName)) {
+        const method = methods.find((m) => m.name === functionName);
+        return method?.complexity.notation || "O(1)";
+      }
+
+      if (processing.has(functionName)) {
+        // Circular dependency - return current complexity
+        const method = methods.find((m) => m.name === functionName);
+        return method?.complexity.notation || "O(1)";
+      }
+
+      processing.add(functionName);
+
+      const calledFunctions = callHierarchy.get(functionName) || [];
+      const method = methods.find((m) => m.name === functionName);
+
+      if (!method) {
+        processing.delete(functionName);
+        processed.add(functionName);
+        return "O(1)";
+      }
+
+      // Start with the function's own complexity
+      const ownComplexity = method.complexity.notation;
+      const allComplexities = [ownComplexity];
+
+      // Add complexities of all called functions
+      for (const calledFunction of calledFunctions) {
+        const calledComplexity = processFunction(calledFunction);
+        allComplexities.push(calledComplexity);
+      }
+
+      // Determine the highest complexity
+      const finalComplexity = getHighestComplexity(allComplexities);
+
+      // Update the method's complexity if it changed
+      if (finalComplexity !== ownComplexity) {
+        const reasons = [
+          method.complexity.description,
+          `Calls functions with complexities: ${calledFunctions
+            .map((f) => {
+              const calledMethod = methods.find((m) => m.name === f);
+              return `${f}(${calledMethod?.complexity.notation || "O(1)"})`;
+            })
+            .join(", ")}`,
+        ].filter((r) => r && r.length > 0);
+
+        method.complexity = {
+          notation: finalComplexity,
+          description: reasons.join("; "),
+          confidence: Math.min(method.complexity.confidence, 85, 100), // Cap at 100% and slightly lower for propagated
+        };
+
+        console.log(
+          `Updated ${functionName}: ${ownComplexity} -> ${finalComplexity} (calls: ${calledFunctions.join(
+            ", "
+          )})`
+        );
+      }
+
+      processing.delete(functionName);
+      processed.add(functionName);
+      return finalComplexity;
+    };
+
+    // Process all functions
+    for (const method of methods) {
+      processFunction(method.name);
+    }
   }
 }

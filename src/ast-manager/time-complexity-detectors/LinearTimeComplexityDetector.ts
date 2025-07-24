@@ -103,6 +103,22 @@ export class LinearTimeComplexityDetector extends TimeComplexityPatternDetector 
           loopsOverInput = true;
         }
       }
+
+      if (astNode.type === "while_statement") {
+        const loopText = astNode.text;
+        // While loops that process elements linearly
+        // Common patterns: while i < len(array), while left/right indices
+        if (
+          loopText.includes("<") &&
+          (loopText.includes("len") ||
+            loopText.includes("i") ||
+            loopText.includes("j") ||
+            loopText.includes("left") ||
+            loopText.includes("right"))
+        ) {
+          loopsOverInput = true;
+        }
+      }
     });
 
     return loopsOverInput;

@@ -1,7 +1,7 @@
 import { analyzeCodeComplexity } from "../../analysis/complexityAnalyzer";
 import { getComplexityIndicator } from "../../utils/complexityHelperUtils";
 
-describe("TERRIBLE Complexity - O(k^n) and O(n!) Factorial Time", () => {
+describe("TERRIBLE Complexity - O(2^n) and O(n!) Factorial Time", () => {
   describe("O(n!) Factorial Time", () => {
     test("should correctly identify O(n!) permutations", () => {
       const pythonCode = `def generate_permutations(arr):
@@ -31,9 +31,9 @@ describe("TERRIBLE Complexity - O(k^n) and O(n!) Factorial Time", () => {
       expect(rating).toBe("TERRIBLE");
     });
 
-    test("should rate O(k^n) complexity as TERRIBLE", () => {
-      const rating = getComplexityIndicator("O(k^n)");
-      expect(rating).toBe("TERRIBLE");
+    test("should rate O(2^n) complexity as BAD", () => {
+      const rating = getComplexityIndicator("O(2^n)");
+      expect(rating).toBe("BAD");
     });
 
     test("should identify traveling salesman as O(n!)", () => {
@@ -127,14 +127,14 @@ describe("TERRIBLE Complexity - O(k^n) and O(n!) Factorial Time", () => {
     });
   });
 
-  describe("O(k^n) Exponential with Base k", () => {
-    test("should identify k-way recursive calls as O(k^n)", () => {
+  describe("O(2^n) Exponential Patterns", () => {
+    test("should identify k-way merge sort as O(n log n)", () => {
       const pythonCode = `def k_way_merge_sort(arr, k=3):
-    """K-way merge sort with exponential splits - O(k^n)"""
+    """K-way merge sort - O(n log n)"""
     if len(arr) <= 1:
         return arr
     
-    # Split into k parts recursively (exponential)
+    # Split into k parts recursively
     chunk_size = max(1, len(arr) // k)
     chunks = []
     
@@ -154,37 +154,56 @@ def merge_k_arrays(arrays):
     return sorted(result)`;
 
       const result = analyzeCodeComplexity(pythonCode);
-      expect(result.methods[0].complexity.notation).toBe("O(k^n)");
+      expect(result.methods[0].complexity.notation).toBe("O(n log n)");
     });
 
-    test("should identify decision tree with k branches as O(k^n)", () => {
-      const pythonCode = `def solve_with_k_choices(problem, k=4):
-    """Solve problem with k choices at each step - O(k^n)"""
-    if is_solved(problem):
-        return [problem]
-    
-    solutions = []
-    
-    # Try k different approaches at each step
-    for choice in range(k):
-        new_problem = apply_choice(problem, choice)
-        if is_valid(new_problem):
-            sub_solutions = solve_with_k_choices(new_problem, k)
-            solutions.extend(sub_solutions)
-    
-    return solutions
-
-def is_solved(problem):
-    return len(problem) == 0
-
-def apply_choice(problem, choice):
-    return problem[1:]  # Simplified
-
-def is_valid(problem):
-    return True`;
+    test("should identify fibonacci recursion as O(2^n)", () => {
+      const pythonCode = `def fibonacci(n):
+    """Classic fibonacci with exponential time - O(2^n)"""
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)`;
 
       const result = analyzeCodeComplexity(pythonCode);
-      expect(result.methods[0].complexity.notation).toBe("O(k^n)");
+      expect(result.methods[0].complexity.notation).toBe("O(2^n)");
+    });
+
+    test("should identify subset generation as O(2^n)", () => {
+      const pythonCode = `def generate_subsets(arr):
+    """Generate all subsets - O(2^n)"""
+    if not arr:
+        return [[]]
+    
+    first = arr[0]
+    rest = arr[1:]
+    
+    subsets_without = generate_subsets(rest)
+    subsets_with = generate_subsets(rest)
+    
+    # Add first element to each subset
+    result = subsets_without[:]
+    for subset in subsets_with:
+        result.append([first] + subset)
+    
+    return result`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(2^n)");
+    });
+
+    test("should identify tower of hanoi as O(2^n)", () => {
+      const pythonCode = `def tower_of_hanoi(n, source, destination, auxiliary):
+    """Tower of Hanoi - O(2^n)"""
+    if n == 1:
+        print(f"Move disk 1 from {source} to {destination}")
+        return
+    
+    tower_of_hanoi(n-1, source, auxiliary, destination)
+    print(f"Move disk {n} from {source} to {destination}")
+    tower_of_hanoi(n-1, auxiliary, destination, source)`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(2^n)");
     });
   });
 
@@ -213,66 +232,52 @@ def is_valid(problem):
       expect(result.methods[0].complexity.notation).toBe("O(n!)");
     });
 
-    test("should identify sudoku solver as O(k^n)", () => {
-      const pythonCode = `def solve_sudoku(board):
-    """Solve Sudoku puzzle - O(k^n) where k=9"""
-    def is_valid(board, row, col, num):
-        # Check row, column, and 3x3 box
-        for i in range(9):
-            if (board[row][i] == num or 
-                board[i][col] == num or
-                board[3*(row//3) + i//3][3*(col//3) + i%3] == num):
-                return False
-        return True
+    test("should identify binary tree path enumeration as O(2^n)", () => {
+      const pythonCode = `def find_all_paths(root):
+    """Find all paths in binary tree - O(2^n)"""
+    if not root:
+        return []
     
-    def solve():
-        for row in range(9):
-            for col in range(9):
-                if board[row][col] == 0:
-                    for num in range(1, 10):  # Try all 9 numbers
-                        if is_valid(board, row, col, num):
-                            board[row][col] = num
-                            if solve():
-                                return True
-                            board[row][col] = 0
-                    return False
-        return True
+    if not root.left and not root.right:
+        return [[root.val]]
     
-    return solve()`;
+    paths = []
+    
+    # Exponential branching - explore both subtrees
+    left_paths = find_all_paths(root.left)
+    right_paths = find_all_paths(root.right)
+    
+    for path in left_paths:
+        paths.append([root.val] + path)
+    for path in right_paths:
+        paths.append([root.val] + path)
+    
+    return paths`;
 
       const result = analyzeCodeComplexity(pythonCode);
-      expect(result.methods[0].complexity.notation).toBe("O(k^n)");
+      expect(result.methods[0].complexity.notation).toBe("O(2^n)");
     });
 
-    test("should identify graph coloring as O(k^n)", () => {
-      const pythonCode = `def graph_coloring(graph, colors):
-    """Graph coloring with k colors - O(k^n)"""
-    n = len(graph)
-    color_assignment = [0] * n
-    
-    def is_safe(node, color):
-        for neighbor in range(n):
-            if graph[node][neighbor] and color_assignment[neighbor] == color:
-                return False
+    test("should identify boolean formula evaluation as O(2^n)", () => {
+      const pythonCode = `def evaluate_boolean_formula(formula, assignment):
+    """Evaluate boolean formula - O(2^n)"""
+    if not formula:
         return True
     
-    def solve(node):
-        if node == n:
-            return True
-        
-        for color in range(1, colors + 1):  # Try all k colors
-            if is_safe(node, color):
-                color_assignment[node] = color
-                if solve(node + 1):
-                    return True
-                color_assignment[node] = 0
-        
-        return False
-    
-    return solve(0)`;
+    # Boolean evaluation with recursive branching
+    if formula.type == "AND":
+        left_result = evaluate_boolean_formula(formula.left, assignment)
+        right_result = evaluate_boolean_formula(formula.right, assignment)
+        return left_result and right_result
+    elif formula.type == "OR":
+        left_result = evaluate_boolean_formula(formula.left, assignment)
+        right_result = evaluate_boolean_formula(formula.right, assignment)
+        return left_result or right_result
+    else:
+        return assignment.get(formula.variable, False)`;
 
       const result = analyzeCodeComplexity(pythonCode);
-      expect(result.methods[0].complexity.notation).toBe("O(k^n)");
+      expect(result.methods[0].complexity.notation).toBe("O(2^n)");
     });
   });
 });

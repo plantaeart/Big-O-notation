@@ -129,20 +129,22 @@ export class LogarithmicTimeComplexityDetector extends TimeComplexityPatternDete
   }
 
   private detectTreeTraversal(node: any): boolean {
-    const treeKeywords = [
-      "tree",
-      "node",
-      "root",
-      "left",
-      "right",
-      "parent",
-      "child",
-      "bst",
-    ];
+    const treeKeywords = ["tree", "node", "root", "parent", "child", "bst"];
 
     const hasTreeKeywords = node.keywords.some((kw: string) =>
       treeKeywords.some((keyword) => kw.toLowerCase().includes(keyword))
     );
+
+    // Don't classify merge operations as tree traversal
+    const mergeKeywords = ["merge", "combine", "left", "right", "result"];
+    const isMergeOperation = node.keywords.some((kw: string) =>
+      mergeKeywords.includes(kw.toLowerCase())
+    );
+
+    // If this looks like a merge operation, don't classify as tree traversal
+    if (isMergeOperation && !hasTreeKeywords) {
+      return false;
+    }
 
     // Look for single path traversal (not visiting all nodes)
     let hasSinglePathTraversal = false;

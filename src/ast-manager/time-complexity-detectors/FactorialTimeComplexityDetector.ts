@@ -103,6 +103,19 @@ export class FactorialTimeComplexityDetector extends TimeComplexityPatternDetect
   private detectPermutationGeneration(node: any): boolean {
     const functionText = node.astNode.text.toLowerCase();
 
+    // Exclude combination/subset patterns that should be O(2^n), not O(n!)
+    const isCombinationPattern =
+      functionText.includes("combination") ||
+      functionText.includes("subset") ||
+      functionText.includes("sum") ||
+      (functionText.includes("backtrack") &&
+        (functionText.includes("target") ||
+          functionText.includes("remaining")));
+
+    if (isCombinationPattern) {
+      return false;
+    }
+
     // Look for permutation-related keywords
     const hasPermutationKeywords =
       functionText.includes("permutation") ||
@@ -422,6 +435,19 @@ export class FactorialTimeComplexityDetector extends TimeComplexityPatternDetect
     }
 
     const functionText = node.astNode.text.toLowerCase();
+
+    // Exclude combination/subset patterns that should be O(2^n), not O(n!)
+    const isCombinationPattern =
+      functionText.includes("combination") ||
+      functionText.includes("subset") ||
+      functionText.includes("sum") ||
+      (functionText.includes("backtrack") &&
+        (functionText.includes("target") ||
+          functionText.includes("remaining")));
+
+    if (isCombinationPattern) {
+      return false;
+    }
 
     // Exclude simple nested loops without factorial characteristics
     if (
