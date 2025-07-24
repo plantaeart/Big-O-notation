@@ -40,8 +40,10 @@ export class LinearTimeComplexityDetector extends TimeComplexityPatternDetector 
     // Pattern 3: Built-in linear operations
     if (this.detectBuiltinLinearOps(node)) {
       patterns.push("builtin_linear_ops");
-      reasons.push("Uses built-in linear operations");
-      confidence += 35;
+      reasons.push(
+        "Uses built-in linear operations (sum, max, min, len, reversed, etc.)"
+      );
+      confidence += 75; // High confidence - these are definitely O(n)
     }
 
     // Pattern 4: List comprehensions
@@ -129,7 +131,6 @@ export class LinearTimeComplexityDetector extends TimeComplexityPatternDetector 
       "sum",
       "max",
       "min",
-      "len",
       "count",
       "index",
       "find",
@@ -138,11 +139,27 @@ export class LinearTimeComplexityDetector extends TimeComplexityPatternDetector 
       "remove",
       "pop",
       "insert",
+      "reverse",
+      "reversed",
+      "sort",
+      "sorted",
     ];
 
-    return node.keywords.some((kw: string) =>
+    // Note: "len" is O(1) in Python, so we exclude it from linear operations
+
+    // Check keywords
+    const hasLinearKeywords = node.keywords.some((kw: string) =>
       linearOps.includes(kw.toLowerCase())
     );
+
+    // Also check function text directly for common linear operations
+    const functionText = node.astNode.text.toLowerCase();
+    const hasLinearFunctionCalls = linearOps.some(
+      (op) =>
+        functionText.includes(`${op}(`) || functionText.includes(`.${op}(`)
+    );
+
+    return hasLinearKeywords || hasLinearFunctionCalls;
   }
 
   private detectListComprehensions(node: any): boolean {

@@ -101,6 +101,33 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
   }
 
   private detectMathematicalOps(node: any): boolean {
+    // Linear operations that should NOT be considered constant
+    const linearOps = [
+      "sum",
+      "max",
+      "min",
+      "count",
+      "index",
+      "reversed",
+      "reverse",
+      "sort",
+      "sorted",
+    ];
+
+    // Note: "len" is O(1) in Python, so we don't exclude it
+
+    const functionText = node.astNode.text.toLowerCase();
+
+    // Exclude if function contains linear operations on collections
+    const hasLinearOps = linearOps.some(
+      (op) =>
+        functionText.includes(`${op}(`) || functionText.includes(`.${op}(`)
+    );
+
+    if (hasLinearOps) {
+      return false; // Not constant if it has linear operations
+    }
+
     const hasMathKeywords = node.keywords.some((kw: string) =>
       ALGORITHM_KEYWORDS.MATH_FUNCTIONS.some((keyword) =>
         kw.toLowerCase().includes(keyword)

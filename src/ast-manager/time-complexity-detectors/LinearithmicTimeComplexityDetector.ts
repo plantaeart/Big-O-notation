@@ -165,7 +165,7 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
       heapKeywords.some((keyword) => kw.toLowerCase().includes(keyword))
     );
 
-    // Look for heap operations in a loop
+    // Look for heap operations in a loop (this makes it O(n log n))
     let hasHeapInLoop = false;
     if (node.forLoopCount > 0 || node.whileLoopCount > 0) {
       this.traverseAST(node.astNode, (astNode) => {
@@ -190,7 +190,9 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
       });
     }
 
-    return hasHeapKeywords || hasHeapInLoop;
+    // Only return true if heap operations are actually in a loop
+    // Individual heap operations should be O(log n), not O(n log n)
+    return hasHeapKeywords && hasHeapInLoop;
   }
 
   private detectBinarySearchInLoop(node: any): boolean {
@@ -436,38 +438,55 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
 
   /**
    * Detects heap sort pattern
-   * Similar to regex: /heap.*sort.*heapify/i
+   * Should only detect actual heap sort algorithms, not individual heap operations
+   * Similar to regex: /heap.*sort.*loop.*extract/i
    */
   private detectHeapSort(node: any): boolean {
     const functionText = node.astNode.text.toLowerCase();
 
-    // Must have heap sort keywords
-    if (!functionText.includes("heap")) {
+    // Must have heap sort keywords AND loops (heap sort requires multiple operations)
+    if (
+      !functionText.includes("heap") ||
+      node.forLoopCount + node.whileLoopCount === 0
+    ) {
       return false;
     }
 
     let hasHeapify = false;
     let hasHeapOperations = false;
+    let hasLoop = false;
 
     this.traverseAST(node.astNode, (astNode) => {
-      if (astNode.type === "call") {
-        const callText = astNode.text.toLowerCase();
+      // Check for loops
+      if (
+        astNode.type === "for_statement" ||
+        astNode.type === "while_statement"
+      ) {
+        hasLoop = true;
 
-        // Check for heapify operations
-        if (
-          callText.includes("heapify") ||
-          callText.includes("heap_push") ||
-          callText.includes("heap_pop") ||
-          callText.includes("heappush") ||
-          callText.includes("heappop")
-        ) {
-          hasHeapify = true;
-          hasHeapOperations = true;
-        }
+        // Check for heap operations within loops (characteristic of heap sort)
+        this.traverseAST(astNode, (child) => {
+          if (child.type === "call") {
+            const callText = child.text.toLowerCase();
+
+            // Check for heapify operations
+            if (
+              callText.includes("heapify") ||
+              callText.includes("heap_push") ||
+              callText.includes("heap_pop") ||
+              callText.includes("heappush") ||
+              callText.includes("heappop")
+            ) {
+              hasHeapify = true;
+              hasHeapOperations = true;
+            }
+          }
+        });
       }
     });
 
-    return hasHeapify && hasHeapOperations;
+    // Heap sort requires loops AND heap operations (not just individual operations)
+    return hasLoop && hasHeapify && hasHeapOperations;
   }
 
   /**

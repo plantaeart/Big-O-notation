@@ -71,14 +71,23 @@ export class LogarithmicTimeComplexityDetector extends TimeComplexityPatternDete
       confidence += 45;
     }
 
-    // Pattern 7: Heap operations
+    // Pattern 7: Heap operations (80% confidence for individual heap operations)
     if (this.detectHeapOperations(node)) {
       patterns.push("heap_operations");
-      reasons.push("Individual heap operations");
-      confidence += 35;
+      reasons.push("Individual heap operations (heappush, heappop, heapify)");
+      confidence += 80;
     }
 
-    // Pattern 8: Logarithmic keywords
+    // Pattern 8: Mathematical logarithmic operations (90% confidence)
+    if (this.detectMathematicalLogarithms(node)) {
+      patterns.push("mathematical_logarithms");
+      reasons.push(
+        "Mathematical logarithmic functions (log, log2, log10) depending on input"
+      );
+      confidence += 90;
+    }
+
+    // Pattern 9: Logarithmic keywords
     if (this.detectLogarithmicKeywords(node)) {
       patterns.push("logarithmic_keywords");
       reasons.push("Contains logarithmic complexity keywords");
@@ -241,10 +250,27 @@ export class LogarithmicTimeComplexityDetector extends TimeComplexityPatternDete
       heapKeywords.some((keyword) => kw.toLowerCase().includes(keyword))
     );
 
-    // Must not be in a loop (that would be O(n log n))
-    const notInLoop = node.forLoopCount + node.whileLoopCount === 0;
+    // Individual heap operations are O(log n)
+    // Multiple heap operations in a loop would be O(n log n) (handled by LinearithmicDetector)
+    let hasIndividualHeapOps = false;
 
-    return hasHeapKeywords && notInLoop;
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "call" && astNode.childCount > 0) {
+        const functionName = astNode.child(0);
+        if (functionName) {
+          const callText = functionName.text.toLowerCase();
+          if (
+            callText.includes("heappush") ||
+            callText.includes("heappop") ||
+            callText.includes("heapify")
+          ) {
+            hasIndividualHeapOps = true;
+          }
+        }
+      }
+    });
+
+    return hasHeapKeywords && hasIndividualHeapOps;
   }
 
   private detectLogarithmicKeywords(node: any): boolean {
@@ -264,6 +290,37 @@ export class LogarithmicTimeComplexityDetector extends TimeComplexityPatternDete
         kw.toLowerCase().includes(indicator)
       )
     );
+  }
+
+  /**
+   * Detects mathematical logarithmic functions that depend on input size
+   * Patterns include: math.log2(n), math.log(n), math.log10(n), np.log2(n), etc.
+   */
+  private detectMathematicalLogarithms(node: any): boolean {
+    const nodeText = node.astNode ? node.astNode.text : "";
+
+    // Look for mathematical logarithmic function calls with input-dependent arguments
+    const logPatterns = [
+      /\bmath\.log2?\s*\(\s*[^)]*\b(n|len|size)\b[^)]*\)/i,
+      /\bmath\.log10\s*\(\s*[^)]*\b(n|len|size)\b[^)]*\)/i,
+      /\bnp\.log2?\s*\(\s*[^)]*\b(n|len|size)\b[^)]*\)/i,
+      /\bnp\.log10\s*\(\s*[^)]*\b(n|len|size)\b[^)]*\)/i,
+      /\bmath\.log\s*\(\s*[^)]*\b(n|len|size)\b[^)]*\)/i,
+      /\bnumpy\.log2?\s*\(\s*[^)]*\b(n|len|size)\b[^)]*\)/i,
+      /\bnumpy\.log10\s*\(\s*[^)]*\b(n|len|size)\b[^)]*\)/i,
+      // Also detect common tree height calculations
+      /\bmath\.log2?\s*\(\s*[^)]*\+\s*1\s*\)/i,
+      /\bmath\.ceil\s*\(\s*math\.log2?\s*\([^)]*\)\s*\)/i,
+      /\bmath\.floor\s*\(\s*math\.log2?\s*\([^)]*\)\s*\)/i,
+    ];
+
+    for (const pattern of logPatterns) {
+      if (pattern.test(nodeText)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   // HIGH CONFIDENCE DETECTION METHODS - Regex-style specific patterns
