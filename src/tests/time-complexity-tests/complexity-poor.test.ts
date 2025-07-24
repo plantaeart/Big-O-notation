@@ -1,5 +1,5 @@
-import { analyzeCodeComplexity } from "../analysis/complexityAnalyzer";
-import { getComplexityIndicator } from "../utils/complexityHelperUtils";
+import { analyzeCodeComplexity } from "../../analysis/complexityAnalyzer";
+import { getComplexityIndicator } from "../../utils/complexityHelperUtils";
 
 describe("POOR Complexity - O(n²) and O(n³)", () => {
   describe("O(n²) Quadratic Time", () => {

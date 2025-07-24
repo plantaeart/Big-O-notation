@@ -14,35 +14,78 @@ export class ExponentialTimeComplexityDetector extends TimeComplexityPatternDete
     const reasons: string[] = [];
     let confidence = 0;
 
-    // Pattern 1: Classic binary recursion (fibonacci-like)
+    // HIGH CONFIDENCE PATTERNS (90-95%) - Regex-style specific detection
+
+    // Pattern 1: Classic Fibonacci recursion (95% confidence)
+    if (this.detectClassicFibonacci(node)) {
+      patterns.push("classic_fibonacci");
+      reasons.push(
+        "Classic fibonacci with two recursive calls: fibonacci(n-1) + fibonacci(n-2)"
+      );
+      confidence += 95;
+    }
+
+    // Pattern 2: Tower of Hanoi pattern (90% confidence)
+    if (this.detectTowerOfHanoi(node)) {
+      patterns.push("tower_of_hanoi");
+      reasons.push(
+        "Tower of Hanoi pattern with exponential recursive structure"
+      );
+      confidence += 90;
+    }
+
+    // Pattern 3: Binary tree all paths (85% confidence)
+    if (this.detectBinaryTreeAllPaths(node)) {
+      patterns.push("binary_tree_paths");
+      reasons.push("Generates all paths in binary tree structure");
+      confidence += 85;
+    }
+
+    // Pattern 4: Boolean formula evaluation (90% confidence)
+    if (this.detectBooleanFormulaEvaluation(node)) {
+      patterns.push("boolean_formula_evaluation");
+      reasons.push("Boolean formula evaluation with recursive branching");
+      confidence += 90;
+    }
+
+    // Pattern 5: Exhaustive search (knapsack, subset sum) (85% confidence)
+    if (this.detectExhaustiveSearch(node)) {
+      patterns.push("exhaustive_search");
+      reasons.push("Exhaustive search with include/exclude decisions");
+      confidence += 85;
+    }
+
+    // MEDIUM CONFIDENCE PATTERNS (70-80%)
+
+    // Pattern 6: Classic binary recursion (improved)
     if (this.detectBinaryRecursion(node)) {
       patterns.push("binary_recursion");
       reasons.push("Two recursive calls per function call");
-      confidence += 45;
+      confidence += 75; // Increased from 45
     }
 
-    // Pattern 2: Single recursion with binary choice
+    // Pattern 7: Subset/powerset generation (improved)
+    if (this.detectSubsetGeneration(node)) {
+      patterns.push("subset_generation");
+      reasons.push("Generates all subsets or combinations");
+      confidence += 70; // Increased from 40
+    }
+
+    // Pattern 6: Single recursion with binary choice
     if (this.detectSingleRecursionBinaryChoice(node)) {
       patterns.push("single_recursion_binary_choice");
       reasons.push("Single recursion with binary decision pattern");
       confidence += 35;
     }
 
-    // Pattern 3: Subset/powerset generation
-    if (this.detectSubsetGeneration(node)) {
-      patterns.push("subset_generation");
-      reasons.push("Generates all subsets or combinations");
-      confidence += 40;
-    }
-
-    // Pattern 4: Backtracking without memoization
+    // Pattern 7: Backtracking without memoization
     if (this.detectBacktracking(node)) {
       patterns.push("backtracking");
       reasons.push("Backtracking algorithm without memoization");
       confidence += 30;
     }
 
-    // Pattern 5: Exponential keywords
+    // Pattern 8: Exponential keywords
     if (this.detectExponentialKeywords(node)) {
       patterns.push("exponential_keywords");
       reasons.push("Contains exponential-complexity keywords");
@@ -60,9 +103,189 @@ export class ExponentialTimeComplexityDetector extends TimeComplexityPatternDete
       : null;
   }
 
+  /**
+   * Detects boolean formula evaluation with recursive branching
+   * Pattern: recursive calls with boolean operations (and, or, not)
+   */
+  private detectBooleanFormulaEvaluation(node: any): boolean {
+    const functionText = node.astNode.text.toLowerCase();
+
+    // Look for boolean-related keywords
+    const hasBooleanKeywords =
+      functionText.includes("boolean") ||
+      functionText.includes("formula") ||
+      functionText.includes("evaluate") ||
+      functionText.includes("assignment") ||
+      (functionText.includes("and") && functionText.includes("or"));
+
+    // Must have recursive calls
+    if (node.recursiveCallCount === 0) {
+      return false;
+    }
+
+    // Look for binary operations with recursive calls
+    let hasBinaryOperationWithRecursion = false;
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "binary_operator") {
+        const operatorText = astNode.text.toLowerCase();
+        if (
+          operatorText.includes("and") ||
+          operatorText.includes("or") ||
+          operatorText.includes("&") ||
+          operatorText.includes("|")
+        ) {
+          // Check if this operation involves recursive calls
+          let recursiveCallsInOperation = 0;
+          this.traverseAST(astNode, (child) => {
+            if (child.type === "call" && child.childCount > 0) {
+              const functionName = child.child(0);
+              if (functionName && functionName.text === node.funcName) {
+                recursiveCallsInOperation++;
+              }
+            }
+          });
+          if (recursiveCallsInOperation >= 2) {
+            hasBinaryOperationWithRecursion = true;
+          }
+        }
+      }
+    });
+
+    return hasBooleanKeywords || hasBinaryOperationWithRecursion;
+  }
+
+  /**
+   * Detects exhaustive search patterns like knapsack, subset sum
+   * Pattern: recursive calls with include/exclude decisions
+   */
+  private detectExhaustiveSearch(node: any): boolean {
+    const functionText = node.astNode.text.toLowerCase();
+
+    // Look for exhaustive search keywords
+    const hasSearchKeywords =
+      functionText.includes("knapsack") ||
+      functionText.includes("brute_force") ||
+      functionText.includes("exhaustive") ||
+      functionText.includes("subset_sum") ||
+      functionText.includes("combination") ||
+      (functionText.includes("include") && functionText.includes("exclude"));
+
+    // Check if this is a function that contains nested helper functions
+    let hasNestedHelperFunction = false;
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "function_definition") {
+        const funcText = astNode.text.toLowerCase();
+        if (
+          funcText.includes("helper") ||
+          (funcText.includes("def ") && funcText !== node.astNode.text)
+        ) {
+          hasNestedHelperFunction = true;
+        }
+      }
+    });
+
+    // If we have a knapsack function with nested helper, it's likely exponential
+    if (hasSearchKeywords && hasNestedHelperFunction) {
+      return true;
+    }
+
+    // Must have recursive calls for regular detection
+    if (node.recursiveCallCount === 0) {
+      return false;
+    }
+
+    // Look for include/exclude pattern in recursive calls
+    let hasIncludeExcludePattern = false;
+    this.traverseAST(node.astNode, (astNode) => {
+      const nodeText = astNode.text.toLowerCase();
+
+      // Look for comments or variable names with include/exclude
+      if (nodeText.includes("include") && nodeText.includes("exclude")) {
+        hasIncludeExcludePattern = true;
+      }
+
+      // Look for helper function calls with different parameters
+      if (astNode.type === "call" && astNode.childCount > 0) {
+        const callText = astNode.text.toLowerCase();
+        if (callText.includes("helper") && node.recursiveCallCount > 0) {
+          hasIncludeExcludePattern = true;
+        }
+      }
+
+      // Look for two recursive calls pattern (one with item, one without)
+      if (astNode.type === "call" && astNode.childCount > 0) {
+        const functionName = astNode.child(0);
+        if (functionName && functionName.text === node.funcName) {
+          // Check if there are multiple similar recursive calls
+          let similarCalls = 0;
+          this.traverseAST(node.astNode, (otherCall) => {
+            if (otherCall.type === "call" && otherCall.childCount > 0) {
+              const otherFunctionName = otherCall.child(0);
+              if (
+                otherFunctionName &&
+                otherFunctionName.text === node.funcName
+              ) {
+                similarCalls++;
+              }
+            }
+          });
+          if (similarCalls >= 2) {
+            hasIncludeExcludePattern = true;
+          }
+        }
+      }
+    });
+
+    // Look for max/min operations (common in optimization problems)
+    let hasOptimizationOperation = false;
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "call" && astNode.childCount > 0) {
+        const callName = astNode.child(0);
+        if (callName && (callName.text === "max" || callName.text === "min")) {
+          hasOptimizationOperation = true;
+        }
+      }
+    });
+
+    // Look for typical exhaustive search structure: index progression
+    let hasIndexProgression = false;
+    this.traverseAST(node.astNode, (astNode) => {
+      const nodeText = astNode.text.toLowerCase();
+      if (
+        nodeText.includes("index") &&
+        nodeText.includes("+") &&
+        nodeText.includes("1")
+      ) {
+        hasIndexProgression = true;
+      }
+    });
+
+    return (
+      hasSearchKeywords ||
+      (hasIncludeExcludePattern && hasOptimizationOperation) ||
+      (hasIndexProgression &&
+        hasOptimizationOperation &&
+        node.recursiveCallCount > 0)
+    );
+  }
+
   private detectBinaryRecursion(node: any): boolean {
     // Must have at least 2 recursive calls
     if (node.recursiveCallCount < 2) {
+      return false;
+    }
+
+    const functionText = node.astNode.text.toLowerCase();
+
+    // Exclude divide-and-conquer algorithms that should be O(n log n)
+    if (
+      functionText.includes("sort") ||
+      functionText.includes("merge") ||
+      functionText.includes("partition") ||
+      functionText.includes("pivot") ||
+      functionText.includes("divide") ||
+      functionText.includes("conquer")
+    ) {
       return false;
     }
 
@@ -159,20 +382,59 @@ export class ExponentialTimeComplexityDetector extends TimeComplexityPatternDete
       subsetKeywords.some((keyword) => kw.toLowerCase().includes(keyword))
     );
 
-    // Look for append operations with recursive calls
-    let hasAppendWithRecursion = false;
+    // Enhanced pattern detection for power set generation
+    const functionText = node.astNode.text.toLowerCase();
+    const isPowerSetFunction =
+      functionText.includes("power_set") ||
+      functionText.includes("powerset") ||
+      (functionText.includes("subset") && functionText.includes("generate"));
+
+    // Look for recursive calls that build subsets
+    let hasSubsetBuildingPattern = false;
     if (node.recursiveCallCount > 0) {
       this.traverseAST(node.astNode, (astNode) => {
-        if (astNode.type === "call" && astNode.childCount > 0) {
-          const methodCall = astNode.child(0);
-          if (methodCall && methodCall.text.includes("append")) {
-            hasAppendWithRecursion = true;
-          }
+        // Look for list comprehension or extend operations
+        const nodeText = astNode.text.toLowerCase();
+        if (
+          nodeText.includes("extend") ||
+          nodeText.includes("append") ||
+          (nodeText.includes("for") && nodeText.includes("in")) ||
+          nodeText.includes("pop")
+        ) {
+          hasSubsetBuildingPattern = true;
+        }
+
+        // Look for union operations (typical in power set)
+        if (
+          nodeText.includes("|") ||
+          nodeText.includes("union") ||
+          (nodeText.includes("+") && nodeText.includes("subset"))
+        ) {
+          hasSubsetBuildingPattern = true;
         }
       });
     }
 
-    return hasSubsetKeywords || hasAppendWithRecursion;
+    // Look for base case patterns typical in subset generation
+    let hasSubsetBaseCase = false;
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "if_statement") {
+        const conditionText = astNode.text.toLowerCase();
+        if (
+          conditionText.includes("not") ||
+          conditionText.includes("empty") ||
+          (conditionText.includes("len") && conditionText.includes("0"))
+        ) {
+          hasSubsetBaseCase = true;
+        }
+      }
+    });
+
+    return (
+      hasSubsetKeywords ||
+      (isPowerSetFunction && hasSubsetBuildingPattern) ||
+      (hasSubsetBuildingPattern && hasSubsetBaseCase)
+    );
   }
 
   private detectBacktracking(node: any): boolean {
@@ -226,6 +488,222 @@ export class ExponentialTimeComplexityDetector extends TimeComplexityPatternDete
       exponentialIndicators.some((indicator) =>
         kw.toLowerCase().includes(indicator)
       )
+    );
+  }
+
+  // HIGH CONFIDENCE DETECTION METHODS - Regex-style specific patterns
+
+  /**
+   * Detects classic fibonacci recursion pattern
+   * Similar to regex: /fibonacci.*return.*fibonacci.*\(.*n.*-.*1.*\).*\+.*fibonacci.*\(.*n.*-.*2.*\)/
+   */
+  private detectClassicFibonacci(node: any): boolean {
+    const functionText = node.astNode.text.toLowerCase();
+
+    // Must be named fibonacci or fib
+    if (!functionText.includes("fibonacci") && !functionText.includes("fib")) {
+      return false;
+    }
+
+    let hasBaseCase = false;
+    let hasTwoRecursiveCalls = false;
+    let hasNMinus1AndNMinus2 = false;
+    let hasReturnSum = false;
+
+    this.traverseAST(node.astNode, (astNode) => {
+      // Check for base case: if n <= 1 return n
+      if (astNode.type === "if_statement") {
+        const conditionText = astNode.text.toLowerCase();
+        if (
+          (conditionText.includes("<=") || conditionText.includes("<")) &&
+          conditionText.includes("1")
+        ) {
+          hasBaseCase = true;
+        }
+      }
+
+      // Check for return statement with addition
+      if (astNode.type === "return_statement") {
+        const returnText = astNode.text.toLowerCase();
+        if (
+          returnText.includes("+") &&
+          (returnText.includes("fibonacci") || returnText.includes("fib"))
+        ) {
+          hasReturnSum = true;
+
+          // Check for n-1 and n-2 patterns
+          if (
+            (returnText.includes("n-1") || returnText.includes("n - 1")) &&
+            (returnText.includes("n-2") || returnText.includes("n - 2"))
+          ) {
+            hasNMinus1AndNMinus2 = true;
+          }
+        }
+      }
+    });
+
+    // Count recursive calls
+    let recursiveCalls = 0;
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "call") {
+        const callText = astNode.text.toLowerCase();
+        if (callText.includes("fibonacci") || callText.includes("fib")) {
+          recursiveCalls++;
+        }
+      }
+    });
+
+    hasTwoRecursiveCalls = recursiveCalls >= 2;
+
+    return (
+      hasBaseCase &&
+      hasTwoRecursiveCalls &&
+      hasNMinus1AndNMinus2 &&
+      hasReturnSum
+    );
+  }
+
+  /**
+   * Detects Tower of Hanoi recursive pattern
+   * Similar to regex: /hanoi.*hanoi.*hanoi.*hanoi/
+   */
+  private detectTowerOfHanoi(node: any): boolean {
+    const functionText = node.astNode.text.toLowerCase();
+
+    // Must have tower/hanoi related terms
+    if (!functionText.includes("hanoi") && !functionText.includes("tower")) {
+      return false;
+    }
+
+    let hasThreeRecursiveCalls = false;
+    let hasBaseCase = false;
+
+    // Count recursive calls (Tower of Hanoi typically has 3: 2 recursive + 1 move)
+    let recursiveCalls = 0;
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "call") {
+        const callText = astNode.text.toLowerCase();
+        if (callText.includes("hanoi") || callText.includes("tower")) {
+          recursiveCalls++;
+        }
+      }
+
+      // Check for base case
+      if (astNode.type === "if_statement") {
+        const conditionText = astNode.text.toLowerCase();
+        if (conditionText.includes("<=") || conditionText.includes("==")) {
+          hasBaseCase = true;
+        }
+      }
+    });
+
+    hasThreeRecursiveCalls = recursiveCalls >= 2; // At least 2 recursive calls
+
+    return hasThreeRecursiveCalls && hasBaseCase;
+  }
+
+  /**
+   * Detects binary tree all paths pattern
+   * Similar to regex: /paths.*left.*right.*append.*pop/
+   */
+  private detectBinaryTreeAllPaths(node: any): boolean {
+    const functionText = node.astNode.text.toLowerCase();
+
+    // Must have tree/path related terms
+    const hasTreeTerms =
+      functionText.includes("path") ||
+      functionText.includes("tree") ||
+      functionText.includes("root") ||
+      functionText.includes("leaf") ||
+      (functionText.includes("left") && functionText.includes("right"));
+
+    // Enhanced pattern detection for all paths generation
+    const isPathFunction =
+      functionText.includes("all_root_to_leaf_paths") ||
+      functionText.includes("all_paths") ||
+      (functionText.includes("path") &&
+        (functionText.includes("all") || functionText.includes("generate")));
+
+    if (!hasTreeTerms && !isPathFunction) {
+      return false;
+    }
+
+    let hasLeftRightRecursion = false;
+    let hasPathBuildingPattern = false;
+    let recursiveCalls = 0;
+
+    this.traverseAST(node.astNode, (astNode) => {
+      // Look for recursive calls with left/right - relaxed pattern
+      if (astNode.type === "call") {
+        recursiveCalls++;
+        const callText = astNode.text.toLowerCase();
+        if (callText.includes(node.funcName)) {
+          // Check if we have left/right access patterns
+          this.traverseAST(node.astNode, (child) => {
+            const childText = child.text.toLowerCase();
+            if (
+              childText.includes(".left") ||
+              childText.includes(".right") ||
+              (childText.includes("left") && childText.includes("right"))
+            ) {
+              hasLeftRightRecursion = true;
+            }
+          });
+        }
+      }
+
+      // Look for path building patterns - more flexible
+      if (astNode.type === "call") {
+        const callText = astNode.text.toLowerCase();
+        if (
+          callText.includes("extend") ||
+          callText.includes("append") ||
+          callText.includes("add")
+        ) {
+          hasPathBuildingPattern = true;
+        }
+      }
+
+      // Look for list comprehension patterns typical in path generation
+      const nodeText = astNode.text.toLowerCase();
+      if (
+        nodeText.includes("for") &&
+        nodeText.includes("in") &&
+        (nodeText.includes("path") ||
+          nodeText.includes("left") ||
+          nodeText.includes("right"))
+      ) {
+        hasPathBuildingPattern = true;
+      }
+
+      // Look for path concatenation patterns
+      if (nodeText.includes("+") && nodeText.includes("path")) {
+        hasPathBuildingPattern = true;
+      }
+    });
+
+    const hasRecursiveCalls = recursiveCalls >= 1; // Relaxed from 2 to 1
+
+    // Check for base case typical in tree traversal
+    let hasTreeBaseCase = false;
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "if_statement") {
+        const conditionText = astNode.text.toLowerCase();
+        if (
+          (conditionText.includes("not") && conditionText.includes("root")) ||
+          conditionText.includes("none") ||
+          (conditionText.includes("not") &&
+            (conditionText.includes("left") || conditionText.includes("right")))
+        ) {
+          hasTreeBaseCase = true;
+        }
+      }
+    });
+
+    return (
+      (hasLeftRightRecursion && hasRecursiveCalls && hasPathBuildingPattern) ||
+      (isPathFunction && hasRecursiveCalls && hasTreeBaseCase) ||
+      (hasPathBuildingPattern && hasTreeBaseCase && hasRecursiveCalls)
     );
   }
 

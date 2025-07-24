@@ -1,5 +1,5 @@
-import { analyzeCodeComplexity } from "../analysis/complexityAnalyzer";
-import { getComplexityIndicator } from "../utils/complexityHelperUtils";
+import { analyzeCodeComplexity } from "../../analysis/complexityAnalyzer";
+import { getComplexityIndicator } from "../../utils/complexityHelperUtils";
 
 describe("BAD Complexity - O(2^n) Exponential Time", () => {
   describe("Recursive Exponential Patterns", () => {

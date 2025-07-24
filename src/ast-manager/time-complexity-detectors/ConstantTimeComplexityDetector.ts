@@ -59,7 +59,19 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
     const noLoops = node.forLoopCount === 0 && node.whileLoopCount === 0;
     const noRecursion = node.recursiveCallCount === 0;
 
-    return noLoops && noRecursion;
+    // Also check for list comprehensions, which are O(n) loops
+    let hasListComprehensions = false;
+    this.traverseAST(node.astNode, (astNode) => {
+      if (
+        astNode.type === "list_comprehension" ||
+        astNode.type === "set_comprehension" ||
+        astNode.type === "dictionary_comprehension"
+      ) {
+        hasListComprehensions = true;
+      }
+    });
+
+    return noLoops && noRecursion && !hasListComprehensions;
   }
 
   private detectDirectAccess(node: any): boolean {

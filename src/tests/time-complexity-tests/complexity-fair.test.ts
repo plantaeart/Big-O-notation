@@ -1,5 +1,5 @@
-import { analyzeCodeComplexity } from "../analysis/complexityAnalyzer";
-import { getComplexityIndicator } from "../utils/complexityHelperUtils";
+import { analyzeCodeComplexity } from "../../analysis/complexityAnalyzer";
+import { getComplexityIndicator } from "../../utils/complexityHelperUtils";
 
 describe("FAIR Complexity - O(n log n) Linearithmic Time", () => {
   describe("Sorting Algorithms", () => {

@@ -46,6 +46,16 @@ export class ASTSpaceComplexityAnalyzer {
       const tree = this.parser.parse(code);
       const rootNode = tree.rootNode;
 
+      // Check for parse errors or invalid syntax
+      if (this.hasParseErrors(rootNode) || code.trim() === "") {
+        return {
+          notation: "O(1)",
+          confidence: 50,
+          description: "Error in analysis - defaulting to constant space",
+          dataStructures: [],
+        };
+      }
+
       // Find all function definitions
       const functions = this.findFunctionNodes(rootNode);
 
@@ -120,6 +130,25 @@ export class ASTSpaceComplexityAnalyzer {
       description: "Script uses constant space",
       dataStructures: [],
     };
+  }
+
+  /**
+   * Check if the AST contains parse errors
+   */
+  private hasParseErrors(node: Parser.SyntaxNode): boolean {
+    if (node.hasError) {
+      return true;
+    }
+
+    // Also check for ERROR nodes specifically
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (child && (child.type === "ERROR" || this.hasParseErrors(child))) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**

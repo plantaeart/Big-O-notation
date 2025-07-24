@@ -1,6 +1,6 @@
-import { analyzeCodeComplexity } from "../analysis/complexityAnalyzer";
-import { analyzeSpaceComplexity } from "../analysis/spaceAnalyzer";
-import { getComplexityIndicator } from "../utils/complexityHelperUtils";
+import { analyzeCodeComplexity } from "../../analysis/complexityAnalyzer";
+import { analyzeSpaceComplexity } from "../../analysis/spaceAnalyzer";
+import { getComplexityIndicator } from "../../utils/complexityHelperUtils";
 
 describe("EXCELLENT Complexity - O(1) Constant Time", () => {
   describe("Basic O(1) Operations", () => {

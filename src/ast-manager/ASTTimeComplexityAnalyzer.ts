@@ -12,6 +12,7 @@ import { SpaceComplexityResult } from "../models/SpaceComplexityResult.model";
 import { TimeComplexityPatternDetector } from "./time-complexity-detectors/TimeComplexityPatternDetector";
 import { FactorialTimeComplexityDetector } from "./time-complexity-detectors/FactorialTimeComplexityDetector";
 import { ExponentialTimeComplexityDetector } from "./time-complexity-detectors/ExponentialTimeComplexityDetector";
+import { CubicTimeComplexityDetector } from "./time-complexity-detectors/CubicTimeComplexityDetector";
 import { QuadraticTimeComplexityDetector } from "./time-complexity-detectors/QuadraticTimeComplexityDetector";
 import { LinearithmicTimeComplexityDetector } from "./time-complexity-detectors/LinearithmicTimeComplexityDetector";
 import { LinearTimeComplexityDetector } from "./time-complexity-detectors/LinearTimeComplexityDetector";
@@ -34,9 +35,10 @@ export class ASTTimeComplexityAnalyzer {
     // Initialize detectors in priority order (highest to lowest complexity)
     this.detectors = [
       new FactorialTimeComplexityDetector(), // O(n!)
+      new LinearithmicTimeComplexityDetector(), // O(n log n) - check before exponential for divide-and-conquer
       new ExponentialTimeComplexityDetector(), // O(2^n)
-      new QuadraticTimeComplexityDetector(), // O(n²) - Adding Cubic would go here
-      new LinearithmicTimeComplexityDetector(), // O(n log n)
+      new CubicTimeComplexityDetector(), // O(n³)
+      new QuadraticTimeComplexityDetector(), // O(n²)
       new LinearTimeComplexityDetector(), // O(n)
       new LogarithmicTimeComplexityDetector(), // O(log n)
       new ConstantTimeComplexityDetector(), // O(1)
@@ -376,6 +378,16 @@ export class ASTTimeComplexityAnalyzer {
       "heappush",
       "heappop",
       "heapify",
+      // Tree operations
+      "tree",
+      "root",
+      "node",
+      "left",
+      "right",
+      "parent",
+      "child",
+      "bst",
+      "val",
       // Built-in functions
       "sum",
       "max",
@@ -384,6 +396,7 @@ export class ASTTimeComplexityAnalyzer {
       "count",
       "index",
       "range",
+      "enumerate",
       // Algorithm keywords
       "merge",
       "partition",

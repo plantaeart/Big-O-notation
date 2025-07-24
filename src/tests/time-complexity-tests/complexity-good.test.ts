@@ -1,6 +1,6 @@
-import { analyzeCodeComplexity } from "../analysis/complexityAnalyzer";
-import { analyzeSpaceComplexity } from "../analysis/spaceAnalyzer";
-import { getComplexityIndicator } from "../utils/complexityHelperUtils";
+import { analyzeCodeComplexity } from "../../analysis/complexityAnalyzer";
+import { analyzeSpaceComplexity } from "../../analysis/spaceAnalyzer";
+import { getComplexityIndicator } from "../../utils/complexityHelperUtils";
 
 describe("GOOD Complexity - O(log n) and O(n)", () => {
   describe("O(log n) Logarithmic Time", () => {

@@ -2,22 +2,22 @@
 // This file serves as the entry point for all complexity rating tests
 
 // EXCELLENT Performance - O(1) Constant Time
-import "./complexity-excellent.test";
+import "./time-complexity-tests/complexity-excellent.test";
 
 // GOOD Performance - O(log n) Logarithmic and O(n) Linear Time
-import "./complexity-good.test";
+import "./time-complexity-tests/complexity-good.test";
 
 // FAIR Performance - O(n log n) Linearithmic Time
-import "./complexity-fair.test";
+import "./time-complexity-tests/complexity-fair.test";
 
 // POOR Performance - O(n²) Quadratic and O(n³) Cubic Time
-import "./complexity-poor.test";
+import "./time-complexity-tests/complexity-poor.test";
 
 // BAD Performance - O(2^n) Exponential Time
-import "./complexity-bad.test";
+import "./time-complexity-tests/complexity-bad.test";
 
 // TERRIBLE Performance - O(k^n) and O(n!) Factorial Time
-import "./complexity-terrible.test";
+import "./time-complexity-tests/complexity-terrible.test";
 
 /**
  * Big O Complexity Rating System:

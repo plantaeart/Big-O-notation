@@ -230,7 +230,78 @@ export class QuadraticTimeComplexityDetector extends TimeComplexityPatternDetect
       return true;
     }
 
+    // NEW: Enhanced detection of constant-sized inner loops
+    if (this.hasConstantSizedInnerLoop(node)) {
+      return true;
+    }
+
     return hasConstantInnerLoop;
+  }
+
+  /**
+   * Detect if nested loops have constant-sized inner collections
+   */
+  private hasConstantSizedInnerLoop(node: any): boolean {
+    let hasConstantInnerLoop = false;
+
+    this.traverseAST(node.astNode, (astNode) => {
+      if (astNode.type === "for_statement") {
+        // Check if this is an outer loop
+        let hasInnerLoop = false;
+        let innerLoopOverConstant = false;
+
+        this.traverseAST(astNode, (child) => {
+          if (child !== astNode && child.type === "for_statement") {
+            hasInnerLoop = true;
+            const innerLoopText = child.text;
+
+            // Check for constant-sized collections in inner loop
+            if (this.isLoopOverConstantCollection(innerLoopText)) {
+              innerLoopOverConstant = true;
+            }
+          }
+        });
+
+        if (hasInnerLoop && innerLoopOverConstant) {
+          hasConstantInnerLoop = true;
+        }
+      }
+    });
+
+    return hasConstantInnerLoop;
+  }
+
+  /**
+   * Check if a loop iterates over a constant-sized collection
+   */
+  private isLoopOverConstantCollection(loopText: string): boolean {
+    // Pattern 1: for item in small_list where small_list is defined as constant
+    const constantCollectionPatterns = [
+      /for\s+\w+\s+in\s+\[.*\]/, // for item in ['a', 'b', 'c']
+      /for\s+\w+\s+in\s+keywords/, // for keyword in keywords
+      /for\s+\w+\s+in\s+error_patterns/, // for pattern in error_patterns
+      /for\s+\w+\s+in\s+patterns/, // for pattern in patterns
+      /for\s+\w+\s+in\s+\w*_?patterns?\w*/, // various pattern variables
+    ];
+
+    // Check if loop matches constant collection patterns
+    if (constantCollectionPatterns.some((pattern) => pattern.test(loopText))) {
+      return true;
+    }
+
+    // Pattern 2: for item in range(small_constant) where constant < 20
+    const rangeMatch = loopText.match(/for\s+\w+\s+in\s+range\((\d+)\)/);
+    if (rangeMatch) {
+      const rangeSize = parseInt(rangeMatch[1]);
+      if (rangeSize <= 20) {
+        // Consider small constants
+        return true;
+      }
+    }
+
+    // Pattern 3: Look for explicit constant collections defined earlier
+    // This would require more sophisticated analysis of variable definitions
+    return false;
   }
 
   private extractLoopVariable(loopNode: any): string | null {

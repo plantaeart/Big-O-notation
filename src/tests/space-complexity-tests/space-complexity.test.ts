@@ -1,4 +1,4 @@
-import { analyzeSpaceComplexity } from "../analysis/spaceAnalyzer";
+import { analyzeSpaceComplexity } from "../../analysis/spaceAnalyzer";
 
 describe("Space Complexity Detection Tests", () => {
   describe("O(1) Constant Space", () => {

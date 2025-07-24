@@ -1,5 +1,5 @@
-import { analyzeCodeComplexity } from "../analysis/complexityAnalyzer";
-import { getComplexityIndicator } from "../utils/complexityHelperUtils";
+import { analyzeCodeComplexity } from "../../analysis/complexityAnalyzer";
+import { getComplexityIndicator } from "../../utils/complexityHelperUtils";
 
 describe("TERRIBLE Complexity - O(k^n) and O(n!) Factorial Time", () => {
   describe("O(n!) Factorial Time", () => {
