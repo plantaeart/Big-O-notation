@@ -13,7 +13,7 @@ import {
   getComplexityIndicator,
   getSpaceComplexityIndicator,
 } from "../utils/complexityHelperUtils";
-import { getIndentFromLine } from "../utils/codeParserUtils";
+import { getIndentFromLine } from "../comments/commentManager";
 import { MethodAnalysis } from "../models/MethodAnalysis.model";
 
 // Apply color decorations to complexity indicators
