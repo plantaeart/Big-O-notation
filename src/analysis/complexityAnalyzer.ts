@@ -1,13 +1,14 @@
-import { ASTTimeComplexityAnalyzer } from "../ast/ASTTimeComplexityAnalyzer";
+// NEW AST-MANAGER ARCHITECTURE
+import { ASTTimeComplexityAnalyzer } from "../ast-manager/ASTTimeComplexityAnalyzer";
 import { ComplexityAnalysisResult } from "../models/ComplexityAnalysisResult.model";
 
-// AST-based complexity analyzer instance
+// AST-based time complexity analyzer
 const astAnalyzer = new ASTTimeComplexityAnalyzer();
 
 /**
- * Main function to analyze code complexity using AST parsing
- * This replaces the previous regex-based implementation
+ * Main function to analyze code complexity using NEW AST-manager architecture
+ * This replaces the previous AST implementation with the new time-complexity detectors
  */
 export function analyzeCodeComplexity(code: string): ComplexityAnalysisResult {
-  return astAnalyzer.analyzeCodeComplexity(code);
+  return astAnalyzer.analyzeCodeTimeComplexity(code);
 }

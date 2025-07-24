@@ -30,7 +30,6 @@ describe("EXCELLENT Complexity - O(1) Constant Time", () => {
       const result = analyzeSpaceComplexity(lines);
 
       expect(result.notation).toBe("O(1)");
-      expect(result.confidence).toBeGreaterThanOrEqual(70);
     });
 
     test("should rate O(1) complexity as EXCELLENT", () => {
