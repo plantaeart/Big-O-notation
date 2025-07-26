@@ -242,6 +242,7 @@ Use `get_vscode_api` with a query as input to fetch the latest VS Code API refer
 ## Required Actions
 
 - ✅ **Always read project-knowledge-base.md first** for context
+- ✅ **Follow complexity-analysis-workflow.md** for systematic analysis
 - ✅ **Use AST-manager directly** - no wrapper classes needed
 - ✅ **Write Jest tests** for new functionality
 - ✅ **Follow Tree-sitter AST patterns** for all analysis
