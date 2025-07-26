@@ -454,6 +454,7 @@ export class LogarithmicTimeComplexityDetector extends TimeComplexityPatternDete
       if (astNode.type === "while_statement") {
         // Look for assignments that divide by 2 within the while loop
         this.traverseAST(astNode, (child) => {
+          // Check for regular assignment: n = n // 2
           if (child.type === "assignment") {
             const assignText = child.text.toLowerCase();
             // Check for patterns like: n = n // 2, i = i // 2, size = size / 2
@@ -471,6 +472,17 @@ export class LogarithmicTimeComplexityDetector extends TimeComplexityPatternDete
               ) {
                 hasDivideByTwoPattern = true;
               }
+            }
+          }
+          
+          // Check for compound assignment: n //= 2, n /= 2
+          if (child.type === "augmented_assignment") {
+            const assignText = child.text.toLowerCase();
+            if (
+              (assignText.includes("//=") || assignText.includes("/=")) &&
+              assignText.includes("2")
+            ) {
+              hasDivideByTwoPattern = true;
             }
           }
         });

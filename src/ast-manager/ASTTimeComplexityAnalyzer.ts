@@ -52,11 +52,45 @@ export class ASTTimeComplexityAnalyzer {
    */
   analyzeCodeTimeComplexity(code: string): ComplexityAnalysisResult {
     try {
+      // Validate input
+      if (!code || typeof code !== 'string' || code.trim() === '') {
+        console.warn('Invalid or empty code provided to analyzer');
+        return {
+          methods: [],
+          hierarchy: new Map<string, string[]>(),
+        };
+      }
+
       const tree = this.parser.parse(code);
+      
+      // Check if parsing was successful
+      if (!tree || !tree.rootNode) {
+        console.warn('Failed to parse code - tree or rootNode is null');
+        return {
+          methods: [],
+          hierarchy: new Map<string, string[]>(),
+        };
+      }
+
       const rootNode = tree.rootNode;
+      
+      // Check for parsing errors
+      if (rootNode.hasError) {
+        console.warn('Tree-sitter parsing errors detected in code');
+        // Continue anyway but with warning
+      }
 
       const methods: MethodAnalysis[] = [];
       this.findFunctions(rootNode, methods);
+
+      // Check if any functions were found
+      if (methods.length === 0) {
+        console.warn('No functions found in provided code');
+        return {
+          methods: [],
+          hierarchy: new Map<string, string[]>(),
+        };
+      }
 
       // First pass: Analyze each function independently
       const functionComplexities = new Map<string, ComplexityPattern>();

@@ -98,6 +98,7 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
     return hasDirectAccessKeywords || hasDirectIndexing;
   }
 
+
   private detectMathematicalOps(node: any): boolean {
     // Linear operations that should NOT be considered constant
     const linearOps = [
@@ -109,21 +110,41 @@ export class ConstantTimeComplexityDetector extends TimeComplexityPatternDetecto
       PythonKeywords.REVERSE,
       PythonKeywords.SORT,
       PythonKeywords.SORTED,
-      "reversed", // not in PythonKeywords but should be excluded
+      PythonKeywords.REVERSED,
     ];
 
     // Note: PythonKeywords.LEN is O(1) in Python, so we don't exclude it
 
     const functionText = node.astNode.text.toLowerCase();
 
-    // Exclude if function contains linear operations on collections
+    // Special case: allow single append/pop outside of loops as O(1)
+    let hasLoop = node.forLoopCount > 0 || node.whileLoopCount > 0;
+    let hasSingleStackOp = false;
+    if (!hasLoop) {
+      // Look for single append/pop not in a loop
+      let foundStackOp = false;
+      traverseAST(node.astNode, (astNode) => {
+        if (
+          astNode.type === "call" &&
+          astNode.text &&
+          (astNode.text.includes(".append(") || astNode.text.includes(".pop(") )
+        ) {
+          foundStackOp = true;
+        }
+      });
+      if (foundStackOp) {
+        hasSingleStackOp = true;
+      }
+    }
+
+    // Exclude if function contains other linear operations on collections
     const hasLinearOps = linearOps.some(
       (op) =>
         functionText.includes(`${op}(`) || functionText.includes(`.${op}(`)
     );
 
-    if (hasLinearOps) {
-      return false; // Not constant if it has linear operations
+    if (hasLinearOps && !hasSingleStackOp) {
+      return false; // Not constant if it has linear operations (except single append/pop)
     }
 
     const hasMathKeywords = node.keywords.some((kw: string) =>

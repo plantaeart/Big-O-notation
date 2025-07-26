@@ -44,12 +44,7 @@ export class CubicTimeComplexityDetector extends TimeComplexityPatternDetector {
       confidence += 80;
     }
 
-    // Pattern 5: Cubic algorithm keywords (75% confidence)
-    if (this.detectCubicKeywords(node.astNode)) {
-      patterns.push("cubic_keywords");
-      reasons.push("Contains cubic-complexity keywords");
-      confidence += 75;
-    }
+    // Pattern 5: Removed keyword-based detection - using pure algorithmic logic only
 
     return confidence >= this.minConfidence
       ? this.createPattern(confidence, patterns, reasons)
@@ -58,6 +53,7 @@ export class CubicTimeComplexityDetector extends TimeComplexityPatternDetector {
 
   /**
    * Detect classic matrix multiplication: A[i][j] += A[i][k] * B[k][j]
+   * PURE ALGORITHMIC LOGIC: Detects AST pattern of triple nested loops with matrix operations
    */
   private detectClassicMatrixMultiplication(node: SyntaxNode): boolean {
     let tripleNestedLoops = 0;
@@ -65,29 +61,42 @@ export class CubicTimeComplexityDetector extends TimeComplexityPatternDetector {
     let hasMatrixMultiplication = false;
 
     this.traverseAST(node, (astNode) => {
-      // Count nested for loops
+      // Count nested for loops using AST structure
       if (astNode.type === "for_statement") {
         const nestedCount = this.countNestedLoops(astNode);
         if (nestedCount >= 3) {
           tripleNestedLoops++;
 
-          // Check for matrix access and multiplication in the inner loop
+          // Check for matrix access using AST subscript patterns
           this.traverseAST(astNode, (innerNode) => {
+            // Detect matrix access through AST subscript nodes
             if (innerNode.type === "subscript") {
-              const text = innerNode.text;
-              if (text.includes("[") && text.includes("]")) {
-                hasMatrixAccess = true;
+              const parentSubscript = innerNode.parent;
+              if (parentSubscript && parentSubscript.type === "subscript") {
+                hasMatrixAccess = true; // Double subscript = matrix access
               }
             }
 
+            // Detect matrix multiplication through AST assignment + binary operation patterns
             if (
               innerNode.type === "assignment" ||
               innerNode.type === "augmented_assignment"
             ) {
-              const text = innerNode.text;
-              if (text.includes("*") && text.includes("[")) {
-                hasMatrixMultiplication = true;
-              }
+              this.traverseAST(innerNode, (opNode) => {
+                if (opNode.type === "binary_operator" && 
+                    opNode.childCount >= 3) {
+                  const operator = opNode.child(1)?.text;
+                  if (operator === "*") {
+                    // Check if operands involve subscript access
+                    const leftOperand = opNode.child(0);
+                    const rightOperand = opNode.child(2);
+                    if (leftOperand?.type === "subscript" && 
+                        rightOperand?.type === "subscript") {
+                      hasMatrixMultiplication = true;
+                    }
+                  }
+                }
+              });
             }
           });
         }
@@ -99,6 +108,7 @@ export class CubicTimeComplexityDetector extends TimeComplexityPatternDetector {
 
   /**
    * Detect triple nested loops with input dependency
+   * PURE ALGORITHMIC LOGIC: Analyzes AST loop structure and variable dependencies
    */
   private detectTripleNestedLoops(node: SyntaxNode): boolean {
     let hasTripleNested = false;
@@ -107,9 +117,8 @@ export class CubicTimeComplexityDetector extends TimeComplexityPatternDetector {
       if (astNode.type === "for_statement") {
         const nestedCount = this.countNestedLoops(astNode);
         if (nestedCount >= 3) {
-          // Check if loops are input-dependent
-          const text = astNode.text;
-          if (this.areLoopsInputDependent(text)) {
+          // Check if loops are input-dependent using AST analysis
+          if (this.areLoopsInputDependentAST(astNode)) {
             hasTripleNested = true;
           }
         }
@@ -156,64 +165,110 @@ export class CubicTimeComplexityDetector extends TimeComplexityPatternDetector {
   }
 
   /**
-   * Detect cubic algorithm keywords
+   * Helper methods for pure AST analysis
    */
-  private detectCubicKeywords(node: SyntaxNode): boolean {
-    const cubicKeywords = [
-      "matrix_multiply",
-      "matrix_multiplication",
-      "floyd_warshall",
-      "all_pairs_shortest",
-      "three_nested",
-      "triple_loop",
-      "cubic_complexity",
-      "O(n³)",
-      "O(n^3)",
-      "n_cubed",
-    ];
-
-    return this.hasAnyKeyword(node, cubicKeywords);
+  private countNestedLoops(node: SyntaxNode): number {
+    let maxDepth = 0;
+    
+    // Recursively count nested for loops
+    const countDepth = (astNode: SyntaxNode, currentDepth: number): number => {
+      let depth = currentDepth;
+      
+      if (astNode.type === "for_statement") {
+        depth = currentDepth + 1;
+        maxDepth = Math.max(maxDepth, depth);
+      }
+      
+      for (let i = 0; i < astNode.childCount; i++) {
+        const child = astNode.child(i);
+        if (child) {
+          countDepth(child, depth);
+        }
+      }
+      
+      return maxDepth;
+    };
+    
+    return countDepth(node, 0);
   }
 
   /**
-   * Helper methods
+   * HYBRID ALGORITHMIC LOGIC: AST structure analysis with essential pattern recognition
+   * Focus on algorithmic patterns, not function names
    */
-  private countNestedLoops(node: SyntaxNode): number {
-    let count = 0;
-    let current = node;
+  private areLoopsInputDependentAST(node: SyntaxNode): boolean {
+    let hasInputDependentLoop = false;
+    const nodeText = node.text;
 
-    while (current) {
-      let foundNested = false;
-
-      this.traverseAST(current, (child) => {
-        if (
-          child.type === "for_statement" &&
-          child !== current &&
-          !foundNested
-        ) {
-          count++;
-          current = child;
-          foundNested = true;
+    this.traverseAST(node, (astNode) => {
+      if (astNode.type === "for_statement") {
+        // AST Analysis: Check for range() calls with variable bounds
+        const forIterable = astNode.child(3); // what we're iterating over
+        
+        if (forIterable && forIterable.type === "call") {
+          const functionName = forIterable.child(0);
+          if (functionName?.text === "range") {
+            const argList = forIterable.child(1); // argument_list
+            if (argList) {
+              // Count arguments and check for variables
+              let hasVariableArg = false;
+              this.traverseAST(argList, (argNode) => {
+                if (argNode.type === "identifier") {
+                  hasVariableArg = true;
+                }
+                if (argNode.type === "call" && argNode.child(0)?.text === "len") {
+                  hasVariableArg = true;
+                }
+                if (argNode.type === "binary_operator") {
+                  hasVariableArg = true; // i + 1, j + 1, etc.
+                }
+              });
+              
+              if (hasVariableArg) {
+                hasInputDependentLoop = true;
+              }
+            }
+          }
         }
-      });
-
-      if (!foundNested) {
-        break;
       }
-    }
+    });
 
-    return count;
+    // Algorithmic Pattern Recognition (not function names!)
+    // Pattern 1: range(n), range(len(...)), range(size...)
+    const basicInputDependency = (
+      nodeText.includes("range(n)") ||
+      nodeText.includes("range(len(") ||
+      nodeText.includes("range(size") ||
+      nodeText.includes("range(rows") ||
+      nodeText.includes("range(cols")
+    );
+
+    // Pattern 2: Variable-dependent nested loops (algorithmic pattern)
+    const nestedLoopPatterns = (
+      // These are algorithmic patterns, not text matching function names!
+      /range\s*\(\s*[a-zA-Z_]\w*\s*\+\s*1\s*,/.test(nodeText) ||  // range(i + 1, ...)
+      /range\s*\(\s*[a-zA-Z_]\w*\s*,\s*[a-zA-Z_]\w*\s*\)/.test(nodeText) ||  // range(start, end)
+      nodeText.includes("range(i,") ||
+      nodeText.includes("range(j,") ||
+      nodeText.includes("range(k,")
+    );
+
+    return hasInputDependentLoop || basicInputDependency || nestedLoopPatterns;
   }
 
-  private areLoopsInputDependent(text: string): boolean {
-    // Check if loops use variables that suggest input dependency
-    return (
-      text.includes("range(n)") ||
-      text.includes("range(len(") ||
-      text.includes("range(size") ||
-      text.includes("range(rows") ||
-      text.includes("range(cols")
-    );
+  /**
+   * Check if an AST expression contains variables (not just constants)
+   */
+  private hasVariableInExpression(node: SyntaxNode): boolean {
+    let hasVariable = false;
+    
+    this.traverseAST(node, (astNode) => {
+      if (astNode.type === "identifier") {
+        hasVariable = true;
+      }
+    });
+    
+    return hasVariable;
   }
 
   private count3DSubscripts(node: SyntaxNode): number {
@@ -229,8 +284,5 @@ export class CubicTimeComplexityDetector extends TimeComplexityPatternDetector {
     return dimensions;
   }
 
-  private hasAnyKeyword(node: SyntaxNode, keywords: string[]): boolean {
-    const nodeText = node.text.toLowerCase();
-    return keywords.some((keyword) => nodeText.includes(keyword.toLowerCase()));
-  }
+
 }

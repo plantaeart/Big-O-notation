@@ -125,6 +125,94 @@ describe("TERRIBLE Complexity - O(2^n) and O(n!) Factorial Time", () => {
       const result = analyzeCodeComplexity(pythonCode);
       expect(result.methods[0].complexity.notation).toBe("O(n!)");
     });
+
+    test("should identify all_permutations using itertools as O(n!)", () => {
+      const pythonCode = `def all_permutations(arr):
+    """Generate all permutations using itertools - O(n!)"""
+    from itertools import permutations
+    return list(permutations(arr))`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n!)");
+      expect(result.methods[0].complexity.confidence).toBeGreaterThanOrEqual(70);
+    });
+
+    test("should identify traveling_salesman_bruteforce as O(n!)", () => {
+      const pythonCode = `def traveling_salesman_bruteforce(cities, distances):
+    """Traveling Salesman Problem brute force - O(n!)"""
+    from itertools import permutations
+    n = len(cities)
+    min_cost = float('inf')
+    best_route = None
+    
+    # Try all possible permutations
+    for perm in permutations(range(1, n)):  # O(n!)
+        route = [0] + list(perm) + [0]
+        cost = 0
+        for i in range(len(route) - 1):
+            cost += distances[route[i]][route[i + 1]]
+        
+        if cost < min_cost:
+            min_cost = cost
+            best_route = route
+    
+    return best_route, min_cost`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n!)");
+      expect(result.methods[0].complexity.confidence).toBeGreaterThanOrEqual(70);
+    });
+
+    test("should identify n_queens_all_solutions as O(n!)", () => {
+      const pythonCode = `def n_queens_all_solutions(n):
+    """N-Queens problem returning all solutions - O(n!)"""
+    def is_safe(board, row, col):
+        # Check column
+        for i in range(row):
+            if board[i] == col:
+                return False
+        
+        # Check diagonals
+        for i in range(row):
+            if abs(board[i] - col) == abs(i - row):
+                return False
+        return True
+    
+    def solve(board, row):
+        if row == n:
+            return [board[:]]
+        
+        solutions = []
+        for col in range(n):
+            if is_safe(board, row, col):
+                board[row] = col
+                solutions.extend(solve(board, row + 1))
+                board[row] = -1
+        return solutions
+    
+    return solve([-1] * n, 0)`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n!)");
+      expect(result.methods[0].complexity.confidence).toBeGreaterThanOrEqual(70);
+    });
+
+    test("should identify generate_all_passwords as O(n!)", () => {
+      const pythonCode = `def generate_all_passwords(characters, length):
+    """Generate all possible passwords - O(n!)"""
+    if length == 0:
+        return [""]
+    
+    passwords = []
+    for shorter in generate_all_passwords(characters, length - 1):
+        for char in characters:
+            passwords.append(shorter + char)
+    return passwords`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n!)");
+      expect(result.methods[0].complexity.confidence).toBeGreaterThanOrEqual(70);
+    });
   });
 
   describe("O(2^n) Exponential Patterns", () => {

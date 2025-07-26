@@ -10,6 +10,12 @@ def heap_operations(arr):
     return heapq.heappop(heap)    # O(log n)`;
 
     const result = analyzeCodeComplexity(pythonCode);
+    
+    // Defensive programming: check if methods array exists and has content
+    expect(result).toBeDefined();
+    expect(result.methods).toBeDefined();
+    expect(result.methods.length).toBeGreaterThan(0);
+    
     console.log(
       "Heap operations test result:",
       JSON.stringify(result.methods[0].complexity, null, 2)
@@ -24,6 +30,12 @@ def single_heap_push(heap, item):
     heapq.heappush(heap, item)`;
 
     const result = analyzeCodeComplexity(pythonCode);
+    
+    // Defensive programming: check if methods array exists and has content
+    expect(result).toBeDefined();
+    expect(result.methods).toBeDefined();
+    expect(result.methods.length).toBeGreaterThan(0);
+    
     console.log(
       "Single heap push result:",
       JSON.stringify(result.methods[0].complexity, null, 2)
@@ -38,6 +50,12 @@ def single_heap_pop(heap):
     return heapq.heappop(heap)`;
 
     const result = analyzeCodeComplexity(pythonCode);
+    
+    // Defensive programming: check if methods array exists and has content
+    expect(result).toBeDefined();
+    expect(result.methods).toBeDefined();
+    expect(result.methods.length).toBeGreaterThan(0);
+    
     console.log(
       "Single heap pop result:",
       JSON.stringify(result.methods[0].complexity, null, 2)

@@ -368,74 +368,154 @@ export class ExponentialTimeComplexityDetector extends TimeComplexityPatternDete
   }
 
   private detectSubsetGeneration(node: any): boolean {
-    const subsetKeywords = [
-      "subset",
-      "powerset",
-      "power_set",
-      "combination",
-      "generate",
-      "all_subsets",
-      "binary_tree",
-      "paths",
-    ];
-
-    const hasSubsetKeywords = node.keywords.some((kw: string) =>
-      subsetKeywords.some((keyword) => kw.toLowerCase().includes(keyword))
-    );
-
-    // Enhanced pattern detection for power set generation
-    const functionText = node.astNode.text.toLowerCase();
-    const isPowerSetFunction =
-      functionText.includes("power_set") ||
-      functionText.includes("powerset") ||
-      (functionText.includes("subset") && functionText.includes("generate"));
-
-    // Look for recursive calls that build subsets
-    let hasSubsetBuildingPattern = false;
-    if (node.recursiveCallCount > 0) {
-      this.traverseAST(node.astNode, (astNode) => {
-        // Look for list comprehension or extend operations
-        const nodeText = astNode.text.toLowerCase();
-        if (
-          nodeText.includes("extend") ||
-          nodeText.includes("append") ||
-          (nodeText.includes("for") && nodeText.includes("in")) ||
-          nodeText.includes("pop")
-        ) {
-          hasSubsetBuildingPattern = true;
-        }
-
-        // Look for union operations (typical in power set)
-        if (
-          nodeText.includes("|") ||
-          nodeText.includes("union") ||
-          (nodeText.includes("+") && nodeText.includes("subset"))
-        ) {
-          hasSubsetBuildingPattern = true;
-        }
-      });
+    // AST-based algorithmic detection for O(2^n) subset generation patterns
+    
+    // Pattern 1: Detect range(2**n) or range(2^n) - iterative power set generation
+    const hasExponentialRange = this.detectExponentialRangePattern(node.astNode);
+    if (hasExponentialRange) {
+      return true;
+    }
+    
+    // Pattern 2: Detect recursive subset generation (classic divide and conquer)
+    const hasRecursiveSubsetPattern = this.detectRecursiveSubsetPattern(node);
+    if (hasRecursiveSubsetPattern) {
+      return true;
     }
 
-    // Look for base case patterns typical in subset generation
+    // Pattern 3: Detect bit manipulation for subset generation
+    const hasBitManipulationPattern = this.detectBitManipulationPattern(node.astNode);
+    if (hasBitManipulationPattern) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private detectExponentialRangePattern(astNode: any): boolean {
+    // Look for range(2**n), range(2^n), or similar exponential iteration patterns
+    let hasExponentialRange = false;
+    
+    this.traverseAST(astNode, (node) => {
+      if (node.type === "call" && node.children) {
+        // Check if this is a range() call
+        const functionName = node.children.find(child => child.type === "identifier");
+        if (functionName && functionName.text === "range") {
+          
+          // Look for arguments containing exponential expressions
+          const argumentList = node.children.find(child => child.type === "argument_list");
+          if (argumentList) {
+            this.traverseAST(argumentList, (argNode) => {
+              // Check for 2**n or 2^n patterns in arguments
+              if (argNode.type === "binary_operator" && argNode.children && argNode.children.length >= 3) {
+                const left = argNode.children[0];
+                const operator = argNode.children[1];
+                const right = argNode.children[2];
+                
+                // Detect 2**n pattern (Python exponentiation)
+                if (left && left.text === "2" && 
+                    operator && operator.text === "**" &&
+                    right && this.isVariableOrParameter(right)) {
+                  hasExponentialRange = true;
+                }
+                
+                // Detect 2^n pattern (bitwise XOR used as exponentiation in some contexts)
+                if (left && left.text === "2" && 
+                    operator && operator.text === "^" &&
+                    right && this.isVariableOrParameter(right)) {
+                  hasExponentialRange = true;
+                }
+              }
+              
+              // Check for pow(2, n) pattern
+              if (argNode.type === "call" && argNode.children) {
+                const powFunction = argNode.children.find(child => child.type === "identifier");
+                if (powFunction && powFunction.text === "pow") {
+                  const powArgs = argNode.children.find(child => child.type === "argument_list");
+                  if (powArgs && powArgs.children && powArgs.children.length >= 3) {
+                    const firstArg = powArgs.children[0];
+                    const secondArg = powArgs.children[2]; // Skip comma
+                    if (firstArg && firstArg.text === "2" && 
+                        secondArg && this.isVariableOrParameter(secondArg)) {
+                      hasExponentialRange = true;
+                    }
+                  }
+                }
+              }
+            });
+          }
+        }
+      }
+    });
+    
+    return hasExponentialRange;
+  }
+
+  private detectRecursiveSubsetPattern(node: any): boolean {
+    // Detect classic recursive subset generation pattern
+    if (node.recursiveCallCount < 1) {
+      return false;
+    }
+
+    let hasSubsetBuildingPattern = false;
     let hasSubsetBaseCase = false;
+    
     this.traverseAST(node.astNode, (astNode) => {
+      // Look for list operations typical in subset generation
+      if (astNode.type === "assignment" || astNode.type === "expression_statement") {
+        const nodeText = astNode.text.toLowerCase();
+        if (nodeText.includes("extend") || 
+            nodeText.includes("append") ||
+            (nodeText.includes("|") && nodeText.includes("{"))) { // Set union operations
+          hasSubsetBuildingPattern = true;
+        }
+      }
+
+      // Look for base case patterns
       if (astNode.type === "if_statement") {
         const conditionText = astNode.text.toLowerCase();
-        if (
-          conditionText.includes("not") ||
-          conditionText.includes("empty") ||
-          (conditionText.includes("len") && conditionText.includes("0"))
-        ) {
+        if (conditionText.includes("not") ||
+            conditionText.includes("empty") ||
+            (conditionText.includes("len") && conditionText.includes("0"))) {
           hasSubsetBaseCase = true;
         }
       }
     });
 
-    return (
-      hasSubsetKeywords ||
-      (isPowerSetFunction && hasSubsetBuildingPattern) ||
-      (hasSubsetBuildingPattern && hasSubsetBaseCase)
-    );
+    return hasSubsetBuildingPattern && hasSubsetBaseCase;
+  }
+
+  private detectBitManipulationPattern(astNode: any): boolean {
+    // Detect bit manipulation for subset generation (e.g., using bit positions)
+    let hasBitOperations = false;
+    let hasIterationOverBits = false;
+    
+    this.traverseAST(astNode, (node) => {
+      // Look for bitwise operations
+      if (node.type === "binary_operator" && node.children && node.children.length >= 3) {
+        const operator = node.children[1];
+        if (operator && (operator.text === "&" || operator.text === "|" || 
+                        operator.text === "<<" || operator.text === ">>")) {
+          hasBitOperations = true;
+        }
+      }
+      
+      // Look for iteration patterns with bit checking
+      if (node.type === "for_statement") {
+        const nodeText = node.text.toLowerCase();
+        if (nodeText.includes("range") && (nodeText.includes("&") || nodeText.includes("bit"))) {
+          hasIterationOverBits = true;
+        }
+      }
+    });
+    
+    return hasBitOperations && hasIterationOverBits;
+  }
+
+  private isVariableOrParameter(node: any): boolean {
+    // Check if node represents a variable (identifier) that could be n
+    return node && (node.type === "identifier" || 
+                   node.type === "subscript" ||
+                   node.type === "attribute");
   }
 
   private detectBacktracking(node: any): boolean {

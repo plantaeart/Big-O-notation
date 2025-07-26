@@ -90,6 +90,20 @@ def calculate_similarity(func1, func2):
       expect(result.methods[0].complexity.notation).toBe("O(n²)");
     });
 
+    test("should identify find pairs with sum as O(n²)", () => {
+      const pythonCode = `def find_pairs_with_sum(arr, target_sum):
+    """Find all pairs that sum to target - O(n²)"""
+    pairs = []
+    for i in range(len(arr)):       # O(n)
+        for j in range(i + 1, len(arr)):  # O(n)
+            if arr[i] + arr[j] == target_sum:
+                pairs.append((arr[i], arr[j]))
+    return pairs`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n²)");
+    });
+
     test("should identify selection sort as O(n²)", () => {
       const pythonCode = `def selection_sort(arr):
     """Selection sort - O(n²)"""
@@ -173,6 +187,22 @@ def calculate_similarity(func1, func2):
             for k in range(len(matrix[0][0])):
                 result += matrix[i][j][k]
     return result`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n³)");
+    });
+
+    test("should identify find triplets with sum as O(n³)", () => {
+      const pythonCode = `def find_triplets_with_sum(arr, target_sum):
+    """Find all triplets that sum to target - O(n³)"""
+    triplets = []
+    n = len(arr)
+    for i in range(n):              # O(n)
+        for j in range(i + 1, n):   # O(n)
+            for k in range(j + 1, n):  # O(n)
+                if arr[i] + arr[j] + arr[k] == target_sum:
+                    triplets.append((arr[i], arr[j], arr[k]))
+    return triplets`;
 
       const result = analyzeCodeComplexity(pythonCode);
       expect(result.methods[0].complexity.notation).toBe("O(n³)");

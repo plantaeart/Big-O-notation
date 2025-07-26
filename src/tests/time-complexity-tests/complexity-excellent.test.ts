@@ -2,6 +2,14 @@ import { analyzeCodeComplexity } from "../../analysis/complexityAnalyzer";
 import { analyzeSpaceComplexity } from "../../analysis/spaceAnalyzer";
 import { getComplexityIndicator } from "../../utils/complexityHelperUtils";
 
+  describe("Stack O(1) Operations", () => {
+    test("should identify stack push/pop as O(1)", () => {
+      const pythonCode = `def stack_operations():\n    stack = []\n    stack.append(1)  # O(1) push\n    return stack.pop()  # O(1) pop`;
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(1)");
+    });
+  });
+
 describe("EXCELLENT Complexity - O(1) Constant Time", () => {
   describe("Basic O(1) Operations", () => {
     test("should correctly identify O(1) time complexity", () => {
@@ -109,6 +117,39 @@ describe("EXCELLENT Complexity - O(1) Constant Time", () => {
     if len(arr) == 0:
         return None
     return arr[len(arr) // 2]`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(1)");
+    });
+  });
+
+  describe("Hash Table O(1) Operations", () => {
+    test("should identify hash table lookup as O(1)", () => {
+      const pythonCode = `def hash_operations():
+    my_dict = {"key1": "value1", "key2": "value2"}
+    return my_dict["key1"]  # O(1) lookup`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(1)");
+    });
+  });
+
+  describe("Arithmetic O(1) Operations", () => {
+    test("should identify arithmetic operations as O(1)", () => {
+      const pythonCode = `def arithmetic_operations(a, b):
+    return a + b, a * b, a / b  # All O(1)`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(1)");
+    });
+  });
+
+  describe("Stack O(1) Operations", () => {
+    test("should identify stack push/pop as O(1)", () => {
+      const pythonCode = `def stack_operations():
+    stack = []
+    stack.append(1)  # O(1) push
+    return stack.pop()  # O(1) pop`;
 
       const result = analyzeCodeComplexity(pythonCode);
       expect(result.methods[0].complexity.notation).toBe("O(1)");

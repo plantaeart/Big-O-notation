@@ -445,11 +445,8 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
   private detectHeapSort(node: any): boolean {
     const functionText = node.astNode.text.toLowerCase();
 
-    // Must have heap sort keywords AND loops (heap sort requires multiple operations)
-    if (
-      !functionText.includes("heap") ||
-      node.forLoopCount + node.whileLoopCount === 0
-    ) {
+    // Must have heap sort keywords
+    if (!functionText.includes("heap")) {
       return false;
     }
 
@@ -458,19 +455,22 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
     let hasLoop = false;
 
     this.traverseAST(node.astNode, (astNode) => {
-      // Check for loops
+      // Check for loops AND list comprehensions
       if (
         astNode.type === "for_statement" ||
-        astNode.type === "while_statement"
+        astNode.type === "while_statement" ||
+        astNode.type === "list_comprehension" ||
+        astNode.type === "set_comprehension" ||
+        astNode.type === "dictionary_comprehension"
       ) {
         hasLoop = true;
 
-        // Check for heap operations within loops (characteristic of heap sort)
+        // Check for heap operations within loops/comprehensions (characteristic of heap sort)
         this.traverseAST(astNode, (child) => {
           if (child.type === "call") {
             const callText = child.text.toLowerCase();
 
-            // Check for heapify operations
+            // Check for heap operations
             if (
               callText.includes("heapify") ||
               callText.includes("heap_push") ||
@@ -484,9 +484,25 @@ export class LinearithmicTimeComplexityDetector extends TimeComplexityPatternDet
           }
         });
       }
+
+      // Also check for heapify calls outside of loops (common heap sort pattern)
+      if (astNode.type === "call") {
+        const callText = astNode.text.toLowerCase();
+        if (callText.includes("heapify")) {
+          hasHeapify = true;
+        }
+        if (
+          callText.includes("heappush") ||
+          callText.includes("heappop") ||
+          callText.includes("heap_push") ||
+          callText.includes("heap_pop")
+        ) {
+          hasHeapOperations = true;
+        }
+      }
     });
 
-    // Heap sort requires loops AND heap operations (not just individual operations)
+    // Heap sort requires loops/comprehensions AND heap operations
     return hasLoop && hasHeapify && hasHeapOperations;
   }
 

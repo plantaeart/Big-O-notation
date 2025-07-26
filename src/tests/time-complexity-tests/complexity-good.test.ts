@@ -64,6 +64,39 @@ describe("GOOD Complexity - O(log n) and O(n)", () => {
       const result = analyzeCodeComplexity(pythonCode);
       expect(result.methods[0].complexity.notation).toBe("O(log n)");
     });
+
+    test("should identify tree height calculation as O(log n)", () => {
+      const pythonCode = `def tree_height_calculation(n):
+    # Height of balanced binary tree with n nodes
+    import math
+    return math.ceil(math.log2(n + 1))`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(log n)");
+    });
+
+    test("should identify heap operations as O(log n)", () => {
+      const pythonCode = `def heap_operations(arr):
+    import heapq
+    heap = []
+    heapq.heappush(heap, arr[0])  # O(log n)
+    return heapq.heappop(heap)    # O(log n)`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(log n)");
+    });
+
+    test("should identify bit counting as O(log n)", () => {
+      const pythonCode = `def count_bits(n):
+    count = 0
+    while n:
+        count += 1
+        n //= 2  # Dividing by 2 each time = O(log n)
+    return count`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(log n)");
+    });
   });
 
   describe("O(n) Linear Time", () => {
@@ -174,6 +207,55 @@ describe("GOOD Complexity - O(log n) and O(n)", () => {
         html += f"<li>{item}</li>"
     html += "</ul>"
     return html`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n)");
+    });
+
+    test("should identify find_max as O(n)", () => {
+      const pythonCode = `def find_max(arr):
+    """Find maximum value in array - O(n) time, O(1) space"""
+    if not arr:
+        return None
+    max_val = arr[0]
+    for num in arr:  # O(n)
+        if num > max_val:
+            max_val = num
+    return max_val`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n)");
+    });
+
+    test("should identify count_characters as O(n)", () => {
+      const pythonCode = `def count_characters(text):
+    """Count character frequency - O(n) time, O(1) space"""
+    count = {}
+    for char in text:  # O(n)
+        count[char] = count.get(char, 0) + 1
+    return count`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n)");
+    });
+
+    test("should identify array_operations as O(n)", () => {
+      const pythonCode = `def array_operations(arr):
+    """Array operations - O(n) time, O(1) space"""
+    # Most list operations are O(n)
+    return sum(arr), len(arr), list(reversed(arr))`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n)");
+    });
+
+    test("should identify array processing as O(n)", () => {
+      const pythonCode = `def process_all_elements(arr):
+    """Process all elements - O(n) time, O(1) space"""
+    total = 0
+    for element in arr:  # O(n) - clearly linear
+        total += element * 2
+    return total`;
 
       const result = analyzeCodeComplexity(pythonCode);
       expect(result.methods[0].complexity.notation).toBe("O(n)");

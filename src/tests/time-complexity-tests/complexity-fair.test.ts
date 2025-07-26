@@ -84,6 +84,38 @@ def merge(left, right):
       const result = analyzeCodeComplexity(pythonCode);
       expect(result.methods[0].complexity.notation).toBe("O(n log n)");
     });
+
+    test("should identify heap sort with list comprehension as O(n log n)", () => {
+      const pythonCode = `def heap_sort_comprehension(arr):
+    """Heap sort with list comprehension - O(n log n)"""
+    import heapq
+    heap = arr[:]
+    heapq.heapify(heap)
+    return [heapq.heappop(heap) for _ in range(len(heap))]`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n log n)");
+    });
+
+    test("should identify heap sort with in-place heapify as O(n log n)", () => {
+      const pythonCode = `def heap_sort(arr):
+    """Heap sort with in-place heapify - O(n log n)"""
+    import heapq
+    heapq.heapify(arr)  # O(n)
+    return [heapq.heappop(arr) for _ in range(len(arr))]  # O(n log n)`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n log n)");
+    });
+
+    test("should identify python built-in sort as O(n log n)", () => {
+      const pythonCode = `def python_sort(arr):
+    """Python built-in sort - O(n log n)"""
+    return sorted(arr)  # Timsort - O(n log n)`;
+
+      const result = analyzeCodeComplexity(pythonCode);
+      expect(result.methods[0].complexity.notation).toBe("O(n log n)");
+    });
   });
 
   describe("VSCode Extension O(n log n) Patterns", () => {

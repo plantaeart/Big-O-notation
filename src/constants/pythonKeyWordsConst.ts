@@ -53,4 +53,5 @@ export const PythonKeywords = {
   DICTIONARY: "dictionary",
   STRING: "string",
   VARIABLE: "variable",
+  REVERSED: "reversed",
 };
