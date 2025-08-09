@@ -1,14 +1,63 @@
 {
   "name": "big-o-notation",
-  "displayName": "Big-O-notation",
-  "description": "",
+  "icon": "public/imgs/icon.png",
+  "badges": [
+    {
+      "url": "https://img.shields.io/github/license/plantaeart/Big-O-notation.png",
+      "href": "https://github.com/plantaeart/Big-O-notation/blob/master/LICENSE",
+      "description": "License"
+    },
+    {
+      "url": "https://img.shields.io/github/v/release/plantaeart/Big-O-notation.png",
+      "href": "https://github.com/plantaeart/Big-O-notation/releases",
+      "description": "Latest Release"
+    },
+    {
+      "url": "https://img.shields.io/github/issues/plantaeart/Big-O-notation.png",
+      "href": "https://github.com/plantaeart/Big-O-notation/issues",
+      "description": "GitHub Issues"
+    },
+    {
+      "url": "https://img.shields.io/github/stars/plantaeart/Big-O-notation.png",
+      "href": "https://github.com/plantaeart/Big-O-notation",
+      "description": "GitHub Stars"
+    }
+  ],
+  "displayName": "Big-O Notation Analyzer",
+  "description": "Automatically analyze and visualize time & space complexity of Python functions with Big O notation. Real-time complexity detection, visual decorations, and educational insights for algorithms from O(1) to O(n!).",
   "version": "0.0.1",
+  "publisher": "plantaeart",
+  "author": "plantaeart",
+  "license": "MIT",
+  "keywords": [
+    "big-o",
+    "complexity",
+    "algorithm",
+    "python",
+    "performance",
+    "time complexity",
+    "space complexity",
+    "analysis",
+    "optimization",
+    "algorithms",
+    "python"
+  ],
+  "categories": [
+    "Education",
+    "Linters",
+    "Other"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/plantaeart/Big-O-notation.git"
+  },
+  "bugs": {
+    "url": "https://github.com/plantaeart/Big-O-notation/issues"
+  },
+  "homepage": "https://github.com/plantaeart/Big-O-notation#readme",
   "engines": {
     "vscode": "^1.102.0"
   },
-  "categories": [
-    "Other"
-  ],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
@@ -27,12 +76,14 @@
     "views": {
       "explorer": [
         {
+          "icon": "public/imgs/icon.png",
           "type": "webview",
           "id": "bigONotation.analysisView",
           "name": "Big-O File Analysis",
           "when": "resourceExtname == .py"
         },
         {
+          "icon": "public/imgs/icon.png",
           "type": "webview",
           "id": "bigONotation.fileOverviewView",
           "name": "BIG-O Files Overview"
